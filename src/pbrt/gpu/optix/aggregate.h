@@ -2,13 +2,13 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#ifndef PBRT_GPU_AGGREGATE_H
-#define PBRT_GPU_AGGREGATE_H
+#ifndef PBRT_OPTIX_AGGREGATE_H
+#define PBRT_OPTIX_AGGREGATE_H
 
 #include <pbrt/pbrt.h>
 
 #include <pbrt/gpu/memory.h>
-#include <pbrt/gpu/optix.h>
+#include <pbrt/gpu/common.h>
 #include <pbrt/scene.h>
 #include <pbrt/util/containers.h>
 #include <pbrt/util/pstd.h>
@@ -21,8 +21,7 @@
 #include <string>
 #include <vector>
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <optix.h>
 
 namespace pbrt {
@@ -87,7 +86,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         ThreadLocal<Allocator> &threadAllocators,
-        ThreadLocal<cudaStream_t> &threadCUDAStreams);
+        ThreadLocal<hipStream_t> &threadCUDAStreams);
 
     static BilinearPatchMesh *diceCurveToBLP(const ShapeSceneEntity &shape, int nDiceU,
                                              int nDiceV, Allocator alloc);
@@ -102,7 +101,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         ThreadLocal<Allocator> &threadAllocators,
-        ThreadLocal<cudaStream_t> &threadCUDAStreams);
+        ThreadLocal<hipStream_t> &threadCUDAStreams);
 
     static BVH buildBVHForQuadrics(
         const std::vector<ShapeSceneEntity> &shapes, OptixDeviceContext optixContext,
@@ -114,7 +113,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         ThreadLocal<Allocator> &threadAllocators,
-        ThreadLocal<cudaStream_t> &threadCUDAStreams);
+        ThreadLocal<hipStream_t> &threadCUDAStreams);
 
     int addHGRecords(const BVH &bvh);
 
@@ -129,20 +128,20 @@ class OptiXAggregate : public WavefrontAggregate {
 
     static OptixTraversableHandle buildOptixBVH(
         OptixDeviceContext optixContext, const std::vector<OptixBuildInput> &buildInputs,
-        ThreadLocal<cudaStream_t> &threadCUDAStreams);
+        ThreadLocal<hipStream_t> &threadCUDAStreams);
 
     CUDATrackedMemoryResource *memoryResource;
     std::mutex boundsMutex;
     Bounds3f bounds;
-    CUstream cudaStream;
+    hipStream_t cudaStream;
     OptixDeviceContext optixContext;
     OptixModule optixModule;
     OptixPipeline optixPipeline;
 
     struct ParamBufferState {
         bool used = false;
-        cudaEvent_t finishedEvent;
-        CUdeviceptr ptr = 0;
+        hipEvent_t finishedEvent;
+        hipDeviceptr_t ptr = 0;
         void *hostPtr = nullptr;
     };
     mutable std::vector<ParamBufferState> paramsPool;
@@ -160,4 +159,4 @@ class OptiXAggregate : public WavefrontAggregate {
 
 }  // namespace pbrt
 
-#endif  // PBRT_GPU_AGGREGATE_H
+#endif  // PBRT_OPTIX_AGGREGATE_H

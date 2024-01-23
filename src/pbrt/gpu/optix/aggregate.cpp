@@ -2,9 +2,9 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#include <pbrt/gpu/aggregate.h>
+#include <pbrt/gpu/optix/aggregate.h>
 
-#include <pbrt/gpu/optix.h>
+#include <pbrt/gpu/common.h>
 #include <pbrt/gpu/util.h>
 #include <pbrt/lights.h>
 #include <pbrt/materials.h>
@@ -93,19 +93,19 @@ extern const unsigned char PBRT_EMBEDDED_PTX[];
 }
 
 template <typename T>
-static CUdeviceptr CopyToDevice(pstd::span<const T> buffer) {
+static hipDeviceptr_t CopyToDevice(pstd::span<const T> buffer) {
     void *ptr;
     size_t size = buffer.size() * sizeof(buffer[0]);
-    CUDA_CHECK(cudaMalloc(&ptr, size));
-    CUDA_CHECK(cudaMemcpy(ptr, buffer.data(), size, cudaMemcpyHostToDevice));
-    return CUdeviceptr(ptr);
+    CUDA_CHECK(hipMalloc(&ptr, size));
+    CUDA_CHECK(hipMemcpy(ptr, buffer.data(), size, hipMemcpyHostToDevice));
+    return hipDeviceptr_t(ptr);
 }
 
 STAT_MEMORY_COUNTER("Memory/Acceleration structures", gpuBVHBytes);
 
 OptixTraversableHandle OptiXAggregate::buildOptixBVH(
     OptixDeviceContext optixContext, const std::vector<OptixBuildInput> &buildInputs,
-    ThreadLocal<cudaStream_t> &threadCUDAStreams) {
+    ThreadLocal<hipStream_t> &threadCUDAStreams) {
     if (buildInputs.empty())
         return {};
 
@@ -122,33 +122,33 @@ OptixTraversableHandle OptiXAggregate::buildOptixBVH(
                                              &blasBufferSizes));
 
     uint64_t *compactedSizePtr;
-    CUDA_CHECK(cudaMalloc(&compactedSizePtr, sizeof(uint64_t)));
+    CUDA_CHECK(hipMalloc(&compactedSizePtr, sizeof(uint64_t)));
     OptixAccelEmitDesc emitDesc;
     emitDesc.type = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
-    emitDesc.result = (CUdeviceptr)compactedSizePtr;
+    emitDesc.result = (hipDeviceptr_t)compactedSizePtr;
 
     // Allocate buffers.
     void *tempBuffer;
-    CUDA_CHECK(cudaMalloc(&tempBuffer, blasBufferSizes.tempSizeInBytes));
+    CUDA_CHECK(hipMalloc(&tempBuffer, blasBufferSizes.tempSizeInBytes));
     void *outputBuffer;
-    CUDA_CHECK(cudaMalloc(&outputBuffer, blasBufferSizes.outputSizeInBytes));
+    CUDA_CHECK(hipMalloc(&outputBuffer, blasBufferSizes.outputSizeInBytes));
 
     // Build.
-    cudaStream_t buildStream = threadCUDAStreams.Get();
+    hipStream_t buildStream = threadCUDAStreams.Get();
     OptixTraversableHandle traversableHandle{0};
     OPTIX_CHECK(optixAccelBuild(
         optixContext, buildStream, &accelOptions, buildInputs.data(), buildInputs.size(),
-        CUdeviceptr(tempBuffer), blasBufferSizes.tempSizeInBytes,
-        CUdeviceptr(outputBuffer), blasBufferSizes.outputSizeInBytes, &traversableHandle,
+        hipDeviceptr_t(tempBuffer), blasBufferSizes.tempSizeInBytes,
+        hipDeviceptr_t(outputBuffer), blasBufferSizes.outputSizeInBytes, &traversableHandle,
         &emitDesc, 1));
 
-    CUDA_CHECK(cudaFree(tempBuffer));
+    CUDA_CHECK(hipFree(tempBuffer));
 
-    CUDA_CHECK(cudaStreamSynchronize(buildStream));
+    CUDA_CHECK(hipStreamSynchronize(buildStream));
     uint64_t compactedSize;
-    CUDA_CHECK(cudaMemcpyAsync(&compactedSize, compactedSizePtr, sizeof(uint64_t),
-                               cudaMemcpyDeviceToHost, buildStream));
-    CUDA_CHECK(cudaStreamSynchronize(buildStream));
+    CUDA_CHECK(hipMemcpyAsync(&compactedSize, compactedSizePtr, sizeof(uint64_t),
+                               hipMemcpyDeviceToHost, buildStream));
+    CUDA_CHECK(hipStreamSynchronize(buildStream));
 
     if (compactedSize >= blasBufferSizes.outputSizeInBytes) {
         // No need to compact...
@@ -158,17 +158,17 @@ OptixTraversableHandle OptiXAggregate::buildOptixBVH(
         gpuBVHBytes += compactedSize;
 
         void *asBuffer;
-        CUDA_CHECK(cudaMalloc(&asBuffer, compactedSize));
+        CUDA_CHECK(hipMalloc(&asBuffer, compactedSize));
 
         OPTIX_CHECK(optixAccelCompact(optixContext, buildStream, traversableHandle,
-                                      CUdeviceptr(asBuffer), compactedSize,
+                                      hipDeviceptr_t(asBuffer), compactedSize,
                                       &traversableHandle));
-        CUDA_CHECK(cudaStreamSynchronize(buildStream));
+        CUDA_CHECK(hipStreamSynchronize(buildStream));
 
-        CUDA_CHECK(cudaFree(outputBuffer));
+        CUDA_CHECK(hipFree(outputBuffer));
     }
 
-    CUDA_CHECK(cudaFree(compactedSizePtr));
+    CUDA_CHECK(hipFree(compactedSizePtr));
 
     return traversableHandle;
 }
@@ -296,9 +296,9 @@ std::map<int, TriQuadMesh> OptiXAggregate::PreparePLYMeshes(
                         Point3f *p;
                         Normal3f *n;
                         Point2f *uv;
-                        CUDA_CHECK(cudaMallocManaged(&p, nVertices * sizeof(Point3f)));
-                        CUDA_CHECK(cudaMallocManaged(&n, nVertices * sizeof(Normal3f)));
-                        CUDA_CHECK(cudaMallocManaged(&uv, nVertices * sizeof(Point2f)));
+                        CUDA_CHECK(hipMallocManaged(&p, nVertices * sizeof(Point3f)));
+                        CUDA_CHECK(hipMallocManaged(&n, nVertices * sizeof(Normal3f)));
+                        CUDA_CHECK(hipMallocManaged(&uv, nVertices * sizeof(Point2f)));
 
                         std::memcpy(p, pCPU, nVertices * sizeof(Point3f));
                         std::memcpy(n, nCPU, nVertices * sizeof(Normal3f));
@@ -316,9 +316,9 @@ std::map<int, TriQuadMesh> OptiXAggregate::PreparePLYMeshes(
 
                         std::memcpy(pCPU, p, nVertices * sizeof(Point3f));
 
-                        CUDA_CHECK(cudaFree(p));
-                        CUDA_CHECK(cudaFree(n));
-                        CUDA_CHECK(cudaFree(uv));
+                        CUDA_CHECK(hipFree(p));
+                        CUDA_CHECK(hipFree(n));
+                        CUDA_CHECK(hipFree(uv));
                     },
                     &shape.loc);
 
@@ -346,7 +346,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
     const std::vector<Material> &materials, const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     ThreadLocal<Allocator> &threadAllocators,
-    ThreadLocal<cudaStream_t> &threadCUDAStreams) {
+    ThreadLocal<hipStream_t> &threadCUDAStreams) {
     // Count how many of the shapes are triangle meshes
     std::vector<size_t> meshIndexToShapeIndex;
     for (size_t i = 0; i < shapes.size(); ++i) {
@@ -433,7 +433,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
 
     BVH bvh(nMeshes);
     std::vector<OptixBuildInput> optixBuildInputs(nMeshes);
-    std::vector<CUdeviceptr> pDeviceDevicePtrs(nMeshes);
+    std::vector<hipDeviceptr_t> pDeviceDevicePtrs(nMeshes);
     std::vector<uint32_t> triangleInputFlags(nMeshes);
 
     std::mutex boundsMutex;
@@ -470,21 +470,21 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
 #else
             input.triangleArray.vertexStrideInBytes = sizeof(Point3f);
             Point3f *pGPU;
-            CUDA_CHECK(cudaMalloc(&pGPU, mesh->nVertices * sizeof(Point3f)));
-            CUDA_CHECK(cudaMemcpy(pGPU, mesh->p, mesh->nVertices * sizeof(Point3f),
-                                  cudaMemcpyHostToDevice));
+            CUDA_CHECK(hipMalloc(&pGPU, mesh->nVertices * sizeof(Point3f)));
+            CUDA_CHECK(hipMemcpy(pGPU, mesh->p, mesh->nVertices * sizeof(Point3f),
+                                  hipMemcpyHostToDevice));
 #endif
-            pDeviceDevicePtrs[meshIndex] = CUdeviceptr(pGPU);
+            pDeviceDevicePtrs[meshIndex] = hipDeviceptr_t(pGPU);
             input.triangleArray.vertexBuffers = &pDeviceDevicePtrs[meshIndex];
 
             input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
             input.triangleArray.indexStrideInBytes = 3 * sizeof(int);
             input.triangleArray.numIndexTriplets = mesh->nTriangles;
             int *indicesGPU;
-            CUDA_CHECK(cudaMalloc(&indicesGPU, mesh->nTriangles * 3 * sizeof(int)));
-            CUDA_CHECK(cudaMemcpy(indicesGPU, mesh->vertexIndices, mesh->nTriangles * 3 * sizeof(int),
-                                  cudaMemcpyHostToDevice));
-            input.triangleArray.indexBuffer = CUdeviceptr(indicesGPU);
+            CUDA_CHECK(hipMalloc(&indicesGPU, mesh->nTriangles * 3 * sizeof(int)));
+            CUDA_CHECK(hipMemcpy(indicesGPU, mesh->vertexIndices, mesh->nTriangles * 3 * sizeof(int),
+                                  hipMemcpyHostToDevice));
+            input.triangleArray.indexBuffer = hipDeviceptr_t(indicesGPU);
 
             FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
             Material material = getMaterial(shape, namedMaterials, materials);
@@ -495,7 +495,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
             shape.parameters.ReportUnused();
 
             input.triangleArray.numSbtRecords = 1;
-            input.triangleArray.sbtIndexOffsetBuffer = CUdeviceptr(nullptr);
+            input.triangleArray.sbtIndexOffsetBuffer = hipDeviceptr_t(nullptr);
             input.triangleArray.sbtIndexOffsetSizeInBytes = 0;
             input.triangleArray.sbtIndexOffsetStrideInBytes = 0;
 
@@ -769,7 +769,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
     const std::vector<Material> &materials, const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     ThreadLocal<Allocator> &threadAllocators,
-    ThreadLocal<cudaStream_t> &threadCUDAStreams) {
+    ThreadLocal<hipStream_t> &threadCUDAStreams) {
     // Count how many BLP meshes there are in shapes
     std::vector<size_t> meshIndexToShapeIndex;
     for (size_t i = 0; i < shapes.size(); ++i) {
@@ -821,8 +821,8 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
     std::vector<OptixBuildInput> optixBuildInputs(nMeshes);
     std::vector<OptixAabb> aabbs(nPatches);
     OptixAabb *deviceAABBs;
-    CUDA_CHECK(cudaMalloc(&deviceAABBs, sizeof(OptixAabb) * nPatches));
-    std::vector<CUdeviceptr> aabbDevicePtrs(nMeshes);
+    CUDA_CHECK(hipMalloc(&deviceAABBs, sizeof(OptixAabb) * nPatches));
+    std::vector<hipDeviceptr_t> aabbDevicePtrs(nMeshes);
     std::vector<uint32_t> flags(nMeshes);
 
     std::mutex boundsMutex;
@@ -835,7 +835,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
         input.customPrimitiveArray.numSbtRecords = 1;
         input.customPrimitiveArray.numPrimitives = mesh->nPatches;
         int aabbIndex = meshAABBStartIndex[meshIndex];
-        aabbDevicePtrs[meshIndex] = CUdeviceptr(&deviceAABBs[aabbIndex]);
+        aabbDevicePtrs[meshIndex] = hipDeviceptr_t(&deviceAABBs[aabbIndex]);
         input.customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[meshIndex];
         input.customPrimitiveArray.flags = &flags[meshIndex];
 
@@ -897,14 +897,14 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
         bvh.bounds = Union(bvh.bounds, meshBounds);
     });
 
-    CUDA_CHECK(cudaMemcpyAsync(deviceAABBs, aabbs.data(),
-                               aabbs.size() * sizeof(OptixAabb), cudaMemcpyHostToDevice,
+    CUDA_CHECK(hipMemcpyAsync(deviceAABBs, aabbs.data(),
+                               aabbs.size() * sizeof(OptixAabb), hipMemcpyHostToDevice,
                                threadCUDAStreams.Get()));
 
     bvh.traversableHandle =
         buildOptixBVH(optixContext, optixBuildInputs, threadCUDAStreams);
 
-    CUDA_CHECK(cudaFree(deviceAABBs));
+    CUDA_CHECK(hipFree(deviceAABBs));
 
     return bvh;
 }
@@ -918,7 +918,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForQuadrics(
     const std::vector<Material> &materials, const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     ThreadLocal<Allocator> &threadAllocators,
-    ThreadLocal<cudaStream_t> &threadCUDAStreams) {
+    ThreadLocal<hipStream_t> &threadCUDAStreams) {
     int nQuadrics = 0;
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
         const auto &s = shapes[shapeIndex];
@@ -933,9 +933,9 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForQuadrics(
     BVH bvh(nQuadrics);
     std::vector<OptixBuildInput> optixBuildInputs(nQuadrics);
     OptixAabb *deviceShapeAABBs;
-    CUDA_CHECK(cudaMalloc(&deviceShapeAABBs, sizeof(OptixAabb) * nQuadrics));
+    CUDA_CHECK(hipMalloc(&deviceShapeAABBs, sizeof(OptixAabb) * nQuadrics));
     std::vector<OptixAabb> shapeAABBs(nQuadrics);
-    std::vector<CUdeviceptr> aabbDevicePtrs(nQuadrics);
+    std::vector<hipDeviceptr_t> aabbDevicePtrs(nQuadrics);
     std::vector<uint32_t> flags(nQuadrics);
 
     int quadricIndex = 0;
@@ -963,7 +963,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForQuadrics(
                           float(shapeBounds.pMin.z), float(shapeBounds.pMax.x),
                           float(shapeBounds.pMax.y), float(shapeBounds.pMax.z)};
         shapeAABBs[quadricIndex] = aabb;
-        aabbDevicePtrs[quadricIndex] = CUdeviceptr(&deviceShapeAABBs[quadricIndex]);
+        aabbDevicePtrs[quadricIndex] = hipDeviceptr_t(&deviceShapeAABBs[quadricIndex]);
         input.customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[quadricIndex];
 
         bvh.bounds = Union(bvh.bounds, shapeBounds);
@@ -1008,14 +1008,14 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForQuadrics(
         ++quadricIndex;
     }
 
-    CUDA_CHECK(cudaMemcpyAsync(deviceShapeAABBs, shapeAABBs.data(),
+    CUDA_CHECK(hipMemcpyAsync(deviceShapeAABBs, shapeAABBs.data(),
                                shapeAABBs.size() * sizeof(shapeAABBs[0]),
-                               cudaMemcpyHostToDevice, threadCUDAStreams.Get()));
+                               hipMemcpyHostToDevice, threadCUDAStreams.Get()));
 
     bvh.traversableHandle =
         buildOptixBVH(optixContext, optixBuildInputs, threadCUDAStreams);
 
-    CUDA_CHECK(cudaFree(deviceShapeAABBs));
+    CUDA_CHECK(hipFree(deviceShapeAABBs));
 
     return bvh;
 }
@@ -1184,8 +1184,8 @@ OptiXAggregate::OptiXAggregate(
     const std::map<std::string, pbrt::Material> &namedMaterials,
     const std::vector<pbrt::Material> &materials)
     : memoryResource(memoryResource), cudaStream(nullptr) {
-    CUcontext cudaContext;
-    CU_CHECK(cuCtxGetCurrent(&cudaContext));
+    hipCtx_t cudaContext;
+    CUDA_CHECK(hipCtxGetCurrent(&cudaContext));
     CHECK(cudaContext != nullptr);
 
 #ifdef PBRT_IS_WINDOWS
@@ -1200,19 +1200,19 @@ OptiXAggregate::OptiXAggregate(
         DisableThreadPool();
 #endif  // PBRT_IS_WINDOWS
 
-    ThreadLocal<cudaStream_t> threadCUDAStreams([]() {
-        cudaStream_t stream;
-        cudaStreamCreate(&stream);
+    ThreadLocal<hipStream_t> threadCUDAStreams([]() {
+        hipStream_t stream;
+        hipStreamCreate(&stream);
         return stream;
     });
 
     paramsPool.resize(256);  // should be plenty
     for (ParamBufferState &ps : paramsPool) {
         void *ptr;
-        CUDA_CHECK(cudaMalloc(&ptr, sizeof(RayIntersectParameters)));
-        ps.ptr = (CUdeviceptr)ptr;
-        CUDA_CHECK(cudaEventCreate(&ps.finishedEvent));
-        CUDA_CHECK(cudaMallocHost(&ps.hostPtr, sizeof(RayIntersectParameters)));
+        CUDA_CHECK(hipMalloc(&ptr, sizeof(RayIntersectParameters)));
+        ps.ptr = (hipDeviceptr_t)ptr;
+        CUDA_CHECK(hipEventCreate(&ps.finishedEvent));
+        CUDA_CHECK(hipHostMalloc(&ps.hostPtr, sizeof(RayIntersectParameters)));
     }
 
     // Create OptiX context
@@ -1323,41 +1323,41 @@ OptiXAggregate::OptiXAggregate(
     Allocator alloc(memoryResource);
     RaygenRecord *raygenClosestRecord = alloc.new_object<RaygenRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(raygenPGClosest, raygenClosestRecord));
-    intersectSBT.raygenRecord = (CUdeviceptr)raygenClosestRecord;
+    intersectSBT.raygenRecord = (hipDeviceptr_t)raygenClosestRecord;
 
     MissRecord *missNoOpRecord = alloc.new_object<MissRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(missPGNoOp, missNoOpRecord));
-    intersectSBT.missRecordBase = (CUdeviceptr)missNoOpRecord;
+    intersectSBT.missRecordBase = (hipDeviceptr_t)missNoOpRecord;
     intersectSBT.missRecordStrideInBytes = sizeof(MissRecord);
     intersectSBT.missRecordCount = 1;
 
     // Shadow
     RaygenRecord *raygenShadowRecord = alloc.new_object<RaygenRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(raygenPGShadow, raygenShadowRecord));
-    shadowSBT.raygenRecord = (CUdeviceptr)raygenShadowRecord;
+    shadowSBT.raygenRecord = (hipDeviceptr_t)raygenShadowRecord;
 
     MissRecord *missShadowRecord = alloc.new_object<MissRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(missPGShadow, missShadowRecord));
-    shadowSBT.missRecordBase = (CUdeviceptr)missShadowRecord;
+    shadowSBT.missRecordBase = (hipDeviceptr_t)missShadowRecord;
     shadowSBT.missRecordStrideInBytes = sizeof(MissRecord);
     shadowSBT.missRecordCount = 1;
 
     // Shadow + Tr
     RaygenRecord *raygenShadowTrRecord = alloc.new_object<RaygenRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(raygenPGShadowTr, raygenShadowTrRecord));
-    shadowTrSBT.raygenRecord = (CUdeviceptr)raygenShadowTrRecord;
+    shadowTrSBT.raygenRecord = (hipDeviceptr_t)raygenShadowTrRecord;
 
     MissRecord *missShadowTrRecord = alloc.new_object<MissRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(missPGShadowTr, missShadowTrRecord));
-    shadowTrSBT.missRecordBase = (CUdeviceptr)missShadowTrRecord;
+    shadowTrSBT.missRecordBase = (hipDeviceptr_t)missShadowTrRecord;
     shadowTrSBT.missRecordStrideInBytes = sizeof(MissRecord);
     shadowTrSBT.missRecordCount = 1;
 
     // Random hit
     RaygenRecord *raygenRandomHitRecord = alloc.new_object<RaygenRecord>();
     OPTIX_CHECK(optixSbtRecordPackHeader(raygenPGRandomHit, raygenRandomHitRecord));
-    randomHitSBT.raygenRecord = (CUdeviceptr)raygenRandomHitRecord;
-    randomHitSBT.missRecordBase = (CUdeviceptr)missNoOpRecord;
+    randomHitSBT.raygenRecord = (hipDeviceptr_t)raygenRandomHitRecord;
+    randomHitSBT.missRecordBase = (hipDeviceptr_t)missNoOpRecord;
     randomHitSBT.missRecordStrideInBytes = sizeof(MissRecord);
     randomHitSBT.missRecordCount = 1;
 
@@ -1618,13 +1618,13 @@ OptiXAggregate::OptiXAggregate(
     LOG_VERBOSE("Starting to build top-level IAS");
     OptixBuildInput buildInput = {};
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
-    CUdeviceptr instanceDevicePtr = CopyToDevice(pstd::MakeConstSpan(iasInstances));
+    hipDeviceptr_t instanceDevicePtr = CopyToDevice(pstd::MakeConstSpan(iasInstances));
     buildInput.instanceArray.instances = instanceDevicePtr;
     buildInput.instanceArray.numInstances = iasInstances.size();
 
     rootTraversable = buildOptixBVH(optixContext, {buildInput}, threadCUDAStreams);
 
-    CUDA_CHECK(cudaFree((void *)instanceDevicePtr));
+    CUDA_CHECK(hipFree((void *)instanceDevicePtr));
     LOG_VERBOSE("Finished building top-level IAS");
 
     LOG_VERBOSE("Finished creating shapes and acceleration structures");
@@ -1634,13 +1634,13 @@ OptiXAggregate::OptiXAggregate(
 
     ///////////////////////////////////////////////////////////////////////////
     // Final SBT initialization
-    CUdeviceptr isectHGRBDevicePtr =
+    hipDeviceptr_t isectHGRBDevicePtr =
         CopyToDevice(pstd::MakeConstSpan(intersectHGRecords));
     intersectSBT.hitgroupRecordBase = isectHGRBDevicePtr;
     intersectSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
     intersectSBT.hitgroupRecordCount = intersectHGRecords.size();
 
-    CUdeviceptr shadowHGRBDevicePtr = CopyToDevice(pstd::MakeConstSpan(shadowHGRecords));
+    hipDeviceptr_t shadowHGRBDevicePtr = CopyToDevice(pstd::MakeConstSpan(shadowHGRecords));
     shadowSBT.hitgroupRecordBase = shadowHGRBDevicePtr;
     shadowSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
     shadowSBT.hitgroupRecordCount = shadowHGRecords.size();
@@ -1650,7 +1650,7 @@ OptiXAggregate::OptiXAggregate(
     shadowTrSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
     shadowTrSBT.hitgroupRecordCount = intersectHGRecords.size();
 
-    CUdeviceptr randomHitHGRBDevicePtr =
+    hipDeviceptr_t randomHitHGRBDevicePtr =
         CopyToDevice(pstd::MakeConstSpan(randomHitHGRecords));
     randomHitSBT.hitgroupRecordBase = randomHitHGRBDevicePtr;
     randomHitSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
@@ -1672,12 +1672,12 @@ OptiXAggregate::ParamBufferState &OptiXAggregate::getParamBuffer(
     if (!pbs.used)
         pbs.used = true;
     else
-        CUDA_CHECK(cudaEventSynchronize(pbs.finishedEvent));
+        CUDA_CHECK(hipEventSynchronize(pbs.finishedEvent));
 
     // Copy to host-side pinned memory
     memcpy(pbs.hostPtr, &params, sizeof(params));
-    CUDA_CHECK(cudaMemcpyAsync((void *)pbs.ptr, pbs.hostPtr, sizeof(params),
-                               cudaMemcpyHostToDevice));
+    CUDA_CHECK(hipMemcpyAsync((void *)pbs.ptr, pbs.hostPtr, sizeof(params),
+                               hipMemcpyHostToDevice));
 
     return pbs;
 }
@@ -1689,10 +1689,10 @@ void OptiXAggregate::IntersectClosest(int maxRays, const RayQueue *rayQueue,
                                       MaterialEvalQueue *universalEvalMaterialQueue,
                                       MediumSampleQueue *mediumSampleQueue,
                                       RayQueue *nextRayQueue) const {
-    std::pair<cudaEvent_t, cudaEvent_t> events =
+    std::pair<hipEvent_t, hipEvent_t> events =
         GetProfilerEvents("Trace closest hit rays");
 
-    cudaEventRecord(events.first);
+    hipEventRecord(events.first);
 
     if (rootTraversable) {
         RayIntersectParameters params;
@@ -1717,25 +1717,25 @@ void OptiXAggregate::IntersectClosest(int maxRays, const RayQueue *rayQueue,
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
                                 sizeof(RayIntersectParameters), &intersectSBT, maxRays, 1,
                                 1));
-        CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
+        CUDA_CHECK(hipEventRecord(pbs.finishedEvent));
 
 #ifdef NVTX
         nvtxRangePop();
 #endif
 #ifndef NDEBUG
-        CUDA_CHECK(cudaDeviceSynchronize());
+        CUDA_CHECK(hipDeviceSynchronize());
         LOG_VERBOSE("Post-sync triangle intersect closest");
 #endif
     }
 
-    cudaEventRecord(events.second);
+    hipEventRecord(events.second);
 };
 
 void OptiXAggregate::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
                                      SOA<PixelSampleState> *pixelSampleState) const {
-    std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents("Trace shadow rays");
+    std::pair<hipEvent_t, hipEvent_t> events = GetProfilerEvents("Trace shadow rays");
 
-    cudaEventRecord(events.first);
+    hipEventRecord(events.first);
 
     if (rootTraversable) {
         RayIntersectParameters params;
@@ -1755,26 +1755,26 @@ void OptiXAggregate::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
                                 sizeof(RayIntersectParameters), &shadowSBT, maxRays, 1,
                                 1));
-        CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
+        CUDA_CHECK(hipEventRecord(pbs.finishedEvent));
 
 #ifdef NVTX
         nvtxRangePop();
 #endif
 #ifndef NDEBUG
-        CUDA_CHECK(cudaDeviceSynchronize());
+        CUDA_CHECK(hipDeviceSynchronize());
         LOG_VERBOSE("Post-sync intersect shadow");
 #endif
     }
 
-    cudaEventRecord(events.second);
+    hipEventRecord(events.second);
 }
 
 void OptiXAggregate::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue,
                                        SOA<PixelSampleState> *pixelSampleState) const {
-    std::pair<cudaEvent_t, cudaEvent_t> events =
+    std::pair<hipEvent_t, hipEvent_t> events =
         GetProfilerEvents("Tracing shadow Tr rays");
 
-    cudaEventRecord(events.first);
+    hipEventRecord(events.first);
 
     if (rootTraversable) {
         RayIntersectParameters params;
@@ -1794,26 +1794,26 @@ void OptiXAggregate::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQue
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
                                 sizeof(RayIntersectParameters), &shadowTrSBT, maxRays, 1,
                                 1));
-        CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
+        CUDA_CHECK(hipEventRecord(pbs.finishedEvent));
 
 #ifdef NVTX
         nvtxRangePop();
 #endif
 #ifndef NDEBUG
-        CUDA_CHECK(cudaDeviceSynchronize());
+        CUDA_CHECK(hipDeviceSynchronize());
         LOG_VERBOSE("Post-sync intersect shadow Tr");
 #endif
     }
 
-    cudaEventRecord(events.second);
+    hipEventRecord(events.second);
 }
 
 void OptiXAggregate::IntersectOneRandom(
     int maxRays, SubsurfaceScatterQueue *subsurfaceScatterQueue) const {
-    std::pair<cudaEvent_t, cudaEvent_t> events =
+    std::pair<hipEvent_t, hipEvent_t> events =
         GetProfilerEvents("Tracing subsurface scattering probe rays");
 
-    cudaEventRecord(events.first);
+    hipEventRecord(events.first);
 
     if (rootTraversable) {
         RayIntersectParameters params;
@@ -1832,18 +1832,18 @@ void OptiXAggregate::IntersectOneRandom(
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
                                 sizeof(RayIntersectParameters), &randomHitSBT, maxRays, 1,
                                 1));
-        CUDA_CHECK(cudaEventRecord(pbs.finishedEvent));
+        CUDA_CHECK(hipEventRecord(pbs.finishedEvent));
 
 #ifdef NVTX
         nvtxRangePop();
 #endif
 #ifndef NDEBUG
-        CUDA_CHECK(cudaDeviceSynchronize());
+        CUDA_CHECK(hipDeviceSynchronize());
         LOG_VERBOSE("Post-sync intersect random");
 #endif
     }
 
-    cudaEventRecord(events.second);
+    hipEventRecord(events.second);
 }
 
 }  // namespace pbrt

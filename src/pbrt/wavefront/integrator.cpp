@@ -9,7 +9,11 @@
 #include <pbrt/film.h>
 #include <pbrt/filters.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
-#include <pbrt/gpu/aggregate.h>
+#if defined(__HIP_PLATFORM_AMD__)
+#include <pbrt/gpu/hiprt/aggregate.h>
+#else
+#include <pbrt/gpu/optix/aggregate.h>
+#endif
 #include <pbrt/gpu/memory.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/lights.h>
@@ -36,8 +40,7 @@
 #include <map>
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 
 namespace pbrt {
@@ -154,13 +157,28 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     filter = film.GetFilter();
     sampler = scene.GetSampler();
 
+    // Compute number of scanlines to render per pass
+    Vector2i resolution = film.PixelBounds().Diagonal();
+    // TODO: make this configurable. Base it on the amount of GPU memory?
+    int maxSamples = 1024 * 1024;
+    scanlinesPerPass = std::max(1, maxSamples / resolution.x);
+    int nPasses = (resolution.y + scanlinesPerPass - 1) / scanlinesPerPass;
+    scanlinesPerPass = (resolution.y + nPasses - 1) / nPasses;
+    maxQueueSize = resolution.x * scanlinesPerPass;
+
     if (Options->useGPU) {
 #ifdef PBRT_BUILD_GPU_RENDERER
         CUDATrackedMemoryResource *mr =
             dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
         CHECK(mr);
+#ifdef __HIP_PLATFORM_AMD__
+        aggregate = new HiprtAggregate(scene, mr, textures, shapeIndexToAreaLights, media,
+                                       namedMaterials, materials, maxQueueSize);
+#else
         aggregate = new OptiXAggregate(scene, mr, textures, shapeIndexToAreaLights, media,
                                        namedMaterials, materials);
+#endif
+
 #else
         LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
 #endif
@@ -224,14 +242,6 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     }
 #endif  // PBRT_BUILD_GPU_RENDERER
 
-    // Compute number of scanlines to render per pass
-    Vector2i resolution = film.PixelBounds().Diagonal();
-    // TODO: make this configurable. Base it on the amount of GPU memory?
-    int maxSamples = 1024 * 1024;
-    scanlinesPerPass = std::max(1, maxSamples / resolution.x);
-    int nPasses = (resolution.y + scanlinesPerPass - 1) / scanlinesPerPass;
-    scanlinesPerPass = (resolution.y + nPasses - 1) / nPasses;
-    maxQueueSize = resolution.x * scanlinesPerPass;
     LOG_VERBOSE("Will render in %d passes %d scanlines per pass\n", nPasses,
                 scanlinesPerPass);
 
@@ -604,10 +614,10 @@ std::string WavefrontPathIntegrator::Stats::Print() const {
 #ifdef PBRT_BUILD_GPU_RENDERER
 void WavefrontPathIntegrator::PrefetchGPUAllocations() {
     int deviceIndex;
-    CUDA_CHECK(cudaGetDevice(&deviceIndex));
+    CUDA_CHECK(hipGetDevice(&deviceIndex));
     int hasConcurrentManagedAccess;
-    CUDA_CHECK(cudaDeviceGetAttribute(&hasConcurrentManagedAccess,
-                                      cudaDevAttrConcurrentManagedAccess, deviceIndex));
+    CUDA_CHECK(hipDeviceGetAttribute(&hasConcurrentManagedAccess,
+                                      hipDeviceAttributeConcurrentManagedAccess, deviceIndex));
 
     // Copy all of the scene data structures over to GPU memory.  This
     // ensures that there isn't a big performance hitch for the first batch
@@ -618,9 +628,9 @@ void WavefrontPathIntegrator::PrefetchGPUAllocations() {
         // performance. (This makes it possible to use the values of things
         // like WavefrontPathIntegrator::haveSubsurface to conditionally launch
         // kernels according to what's in the scene...)
-        CUDA_CHECK(cudaMemAdvise(this, sizeof(*this), cudaMemAdviseSetReadMostly,
+        CUDA_CHECK(hipMemAdvise(this, sizeof(*this), hipMemAdviseSetReadMostly,
                                  /* ignored argument */ 0));
-        CUDA_CHECK(cudaMemAdvise(this, sizeof(*this), cudaMemAdviseSetPreferredLocation,
+        CUDA_CHECK(hipMemAdvise(this, sizeof(*this), hipMemAdviseSetPreferredLocation,
                                  deviceIndex));
 
         // Copy all of the scene data structures over to GPU memory.  This
@@ -646,8 +656,8 @@ void WavefrontPathIntegrator::StartDisplayThread() {
     if (Options->useGPU) {
         // Allocate staging memory on the GPU to store the current WIP
         // image.
-        CUDA_CHECK(cudaMalloc(&displayRGB, resolution.x * resolution.y * sizeof(RGB)));
-        CUDA_CHECK(cudaMemset(displayRGB, 0, resolution.x * resolution.y * sizeof(RGB)));
+        CUDA_CHECK(hipMalloc(&displayRGB, resolution.x * resolution.y * sizeof(RGB)));
+        CUDA_CHECK(hipMemset(displayRGB, 0, resolution.x * resolution.y * sizeof(RGB)));
 
         // Host-side memory for the WIP Image.  We'll just let this leak so
         // that the lambda passed to DisplayDynamic below doesn't access
@@ -665,26 +675,26 @@ void WavefrontPathIntegrator::StartDisplayThread() {
             // Copy back to the CPU using a separate stream so that we can
             // periodically but asynchronously pick up the latest results
             // from the GPU.
-            cudaStream_t memcpyStream;
-            CUDA_CHECK(cudaStreamCreate(&memcpyStream));
+            hipStream_t memcpyStream;
+            CUDA_CHECK(hipStreamCreate(&memcpyStream));
             GPUNameStream(memcpyStream, "DISPLAY_SERVER_COPY_STREAM");
 
             // Copy back to the host from the GPU buffer, without any
             // synthronization.
             while (!*exitCopyThread) {
-                CUDA_CHECK(cudaMemcpyAsync(displayRGBHost, displayRGB,
+                CUDA_CHECK(hipMemcpyAsync(displayRGBHost, displayRGB,
                                            resolution.x * resolution.y * sizeof(RGB),
-                                           cudaMemcpyDeviceToHost, memcpyStream));
+                                           hipMemcpyDeviceToHost, memcpyStream));
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-                CUDA_CHECK(cudaStreamSynchronize(memcpyStream));
+                CUDA_CHECK(hipStreamSynchronize(memcpyStream));
             }
 
             // Copy one more time to get the final image before exiting.
-            CUDA_CHECK(cudaMemcpy(displayRGBHost, displayRGB,
+            CUDA_CHECK(hipMemcpy(displayRGBHost, displayRGB,
                                   resolution.x * resolution.y * sizeof(RGB),
-                                  cudaMemcpyDeviceToHost));
-            CUDA_CHECK(cudaDeviceSynchronize());
+                                  hipMemcpyDeviceToHost));
+            CUDA_CHECK(hipDeviceSynchronize());
         });
 
         // Now on the CPU side, give the display system a lambda that

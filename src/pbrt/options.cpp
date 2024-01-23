@@ -3,6 +3,7 @@
 // SPDX: Apache-2.0
 
 #include <pbrt/options.h>
+#include <pbrt/shapes.h>
 
 #if defined(PBRT_BUILD_GPU_RENDERER)
 #include <pbrt/gpu/util.h>
@@ -14,10 +15,11 @@ namespace pbrt {
 PBRTOptions *Options;
 
 #if defined(PBRT_BUILD_GPU_RENDERER)
-__constant__ BasicPBRTOptions OptionsGPU;
+PBRT_GPU __constant__ BasicPBRTOptions OptionsGPU;
 
 void CopyOptionsToGPU() {
-    CUDA_CHECK(cudaMemcpyToSymbol(OptionsGPU, Options, sizeof(OptionsGPU)));
+    CUDA_CHECK(hipMemcpyToSymbol((const void *)&OptionsGPU, (const void *)Options,
+                                 sizeof(OptionsGPU)));
 }
 #endif
 

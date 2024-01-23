@@ -46,8 +46,8 @@ ProgressReporter::ProgressReporter(int64_t totalWork, std::string title, bool qu
         gpuEventsFinishedOffset = 0;
 
         gpuEvents.resize(totalWork);
-        for (cudaEvent_t &event : gpuEvents)
-            CUDA_CHECK(cudaEventCreate(&event));
+        for (hipEvent_t &event : gpuEvents)
+            CUDA_CHECK(hipEventCreate(&event));
     }
 #else
     CHECK(gpu == false);
@@ -117,13 +117,13 @@ void ProgressReporter::printBar() {
 #ifdef PBRT_BUILD_GPU_RENDERER
         if (gpuEvents.size()) {
             while (gpuEventsFinishedOffset < gpuEventsLaunchedOffset) {
-                cudaError_t err = cudaEventQuery(gpuEvents[gpuEventsFinishedOffset]);
-                if (err == cudaSuccess)
+                hipError_t err = hipEventQuery(gpuEvents[gpuEventsFinishedOffset]);
+                if (err == hipSuccess)
                     ++gpuEventsFinishedOffset;
-                else if (err == cudaErrorNotReady)
+                else if (err == hipErrorNotReady)
                     break;
                 else
-                    LOG_FATAL("CUDA error: %s", cudaGetErrorString(err));
+                    LOG_FATAL("CUDA error: %s", hipGetErrorString(err));
             }
             workDone = gpuEventsFinishedOffset;
         }
@@ -157,10 +157,10 @@ void ProgressReporter::Done() {
 #ifdef PBRT_BUILD_GPU_RENDERER
         if (gpuEvents.size()) {
             while (gpuEventsFinishedOffset < gpuEventsLaunchedOffset) {
-                cudaError_t err =
-                    cudaEventSynchronize(gpuEvents[gpuEventsFinishedOffset]);
-                if (err != cudaSuccess)
-                    LOG_FATAL("CUDA error: %s", cudaGetErrorString(err));
+                hipError_t err =
+                    hipEventSynchronize(gpuEvents[gpuEventsFinishedOffset]);
+                if (err != hipSuccess)
+                    LOG_FATAL("CUDA error: %s", hipGetErrorString(err));
             }
             workDone = gpuEvents.size();
         }

@@ -16,7 +16,7 @@
 #include <thread>
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <vector>
 #endif
 
@@ -70,7 +70,7 @@ class ProgressReporter {
     pstd::optional<float> finishTime;
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-    std::vector<cudaEvent_t> gpuEvents;
+    std::vector<hipEvent_t> gpuEvents;
     std::atomic<size_t> gpuEventsLaunchedOffset;
     int gpuEventsFinishedOffset;
 #endif
@@ -85,8 +85,8 @@ inline void ProgressReporter::Update(int64_t num) {
     if (gpuEvents.size() > 0) {
         if (gpuEventsLaunchedOffset + num <= gpuEvents.size()) {
             while (num-- > 0) {
-                CHECK_EQ(cudaEventRecord(gpuEvents[gpuEventsLaunchedOffset]),
-                         cudaSuccess);
+                CHECK_EQ(hipEventRecord(gpuEvents[gpuEventsLaunchedOffset]),
+                         hipSuccess);
                 ++gpuEventsLaunchedOffset;
             }
         }

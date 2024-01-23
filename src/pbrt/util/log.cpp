@@ -121,9 +121,11 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
         ErrorExit("Invalid --log-level specified.");
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-    if (useGPU)
-        CUDA_CHECK(cudaMemcpyToSymbol(LOGGING_LogLevelGPU, &logging::logLevel,
-                                      sizeof(logging::logLevel)));
+    if (useGPU) {
+        CUDA_CHECK(hipMemcpyToSymbol((const void *)&LOGGING_LogLevelGPU,
+                                     (const void *)&logging::logLevel,
+                                     sizeof(logging::logLevel)));
+    }
 #endif
 
     if (logUtilization) {
@@ -290,15 +292,15 @@ void ShutdownLogging() {
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 std::vector<GPULogItem> ReadGPULogs() {
-    CUDA_CHECK(cudaDeviceSynchronize());
+    CUDA_CHECK(hipDeviceSynchronize());
     int nItems;
-    CUDA_CHECK(cudaMemcpyFromSymbol(&nItems, nRawLogItems, sizeof(nItems)));
-
+    CUDA_CHECK(hipMemcpyFromSymbol((void *)&nItems, (const void *)&nRawLogItems,
+                                   sizeof(nItems)));
     nItems = std::min(nItems, MAX_LOG_ITEMS);
     std::vector<GPULogItem> items(nItems);
-    CUDA_CHECK(cudaMemcpyFromSymbol(items.data(), rawLogItems,
+    CUDA_CHECK(hipMemcpyFromSymbol((void *)items.data(), (const void *)&rawLogItems,
                                     nItems * sizeof(GPULogItem), 0,
-                                    cudaMemcpyDeviceToHost));
+                                    hipMemcpyDeviceToHost));
 
     return items;
 }
@@ -327,7 +329,7 @@ std::string ToString(LogLevel level) {
     }
 }
 
-void Log(LogLevel level, const char *file, int line, const char *s) {
+PBRT_CPU_GPU void Log(LogLevel level, const char *file, int line, const char *s) {
 #ifdef PBRT_IS_GPU_CODE
     auto strlen = [](const char *ptr) {
         int len = 0;
@@ -389,7 +391,7 @@ void Log(LogLevel level, const char *file, int line, const char *s) {
 #endif
 }
 
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
 // warning #1305-D: function declared with "noreturn" does return
 #ifdef __NVCC_DIAG_PRAGMA_SUPPORT__
 #pragma nv_diag_suppress 1305
@@ -398,7 +400,7 @@ void Log(LogLevel level, const char *file, int line, const char *s) {
 #endif
 #endif
 
-void LogFatal(LogLevel level, const char *file, int line, const char *s) {
+PBRT_CPU_GPU void LogFatal(LogLevel level, const char *file, int line, const char *s) {
 #ifdef PBRT_IS_GPU_CODE
     Log(LogLevel::Fatal, file, line, s);
     __threadfence();

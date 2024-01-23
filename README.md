@@ -228,3 +228,36 @@ is straightforward:
 ```bash
 $ imgtool denoise-optix noisy.exr --outfile denoised.exr
 ```
+
+Instructions to build the HIP port
+--------
+
+HIPRT:
+* Download [HIPRT-v2.2](https://gpuopen.com/hiprt/)
+* Extract the zip file and copy files from `hiprt/` to `src/ext/hiprtSdk`
+
+Clone:
+* `git clone --recursive https://github.com/GPUOpen-Effects/pbrt-v4.git`
+* `git checkout hip`
+* `cd build`
+
+Linux:
+* `cmake -DCMAKE_C_COMPILER=/opt/rocm/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/rocm/llvm/bin/clang++ -DPBRT_HIPRT=ON ..`
+* `make` or `make pbrt_exe`
+* `./hiprt.sh`
+
+Windows:
+* Run `x64 Native Tools Command Prompt for VS 2022` as administrator
+* `set CC=clang`
+* `set CXX=clang++`
+* `cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DPBRT_HIPRT=ON ..`
+* `cmake --build . --config=Release`
+
+Example: `./pbrt --gpu ~/pbrt-v4-scenes/killeroos/killeroo-simple.pbrt`
+Add `--interactive` for interactive mode.
+
+GPU architecture and ROCm version
+--------
+
+The instructions above assume the `gfx1100` architecture. You can specify other architectures via the CMake `AMDGPU_TARGETS` variable. You also need to change the architecture in `hiprt.sh` and `hiprt.bat`. 
+Note that PBRT must be compiled with the same version as HIPRT binaries (e.g., `hiprt02002_5.7_amd_lib_linux.bc`). If you use a different version of ROCm other than 5.7, you need to adjust it in `hiprt.sh` and `hiprt.bat`.

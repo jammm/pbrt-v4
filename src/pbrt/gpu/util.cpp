@@ -26,12 +26,12 @@
 namespace pbrt {
 
 void GPUInit() {
-    cudaFree(nullptr);
+    hipFree(nullptr);
 
     int driverVersion;
-    CUDA_CHECK(cudaDriverGetVersion(&driverVersion));
+    CUDA_CHECK(hipDriverGetVersion(&driverVersion));
     int runtimeVersion;
-    CUDA_CHECK(cudaRuntimeGetVersion(&runtimeVersion));
+    CUDA_CHECK(hipRuntimeGetVersion(&runtimeVersion));
     auto versionToString = [](int version) {
         int major = version / 1000;
         int minor = (version - major * 1000) / 10;
@@ -41,11 +41,11 @@ void GPUInit() {
                 versionToString(runtimeVersion));
 
     int nDevices;
-    CUDA_CHECK(cudaGetDeviceCount(&nDevices));
+    CUDA_CHECK(hipGetDeviceCount(&nDevices));
     std::string devices;
     for (int i = 0; i < nDevices; ++i) {
-        cudaDeviceProp deviceProperties;
-        CUDA_CHECK(cudaGetDeviceProperties(&deviceProperties, i));
+        hipDeviceProp_t deviceProperties;
+        CUDA_CHECK(hipGetDeviceProperties(&deviceProperties, i));
         CHECK(deviceProperties.canMapHostMemory);
 
         std::string deviceString = StringPrintf(
@@ -74,23 +74,27 @@ void GPUInit() {
 #ifdef NVTX
     nvtxNameCuDevice(device, "PBRT_GPU");
 #endif
-    CUDA_CHECK(cudaSetDevice(device));
+    CUDA_CHECK(hipSetDevice(device));
 
-    int hasUnifiedAddressing;
-    CUDA_CHECK(cudaDeviceGetAttribute(&hasUnifiedAddressing, cudaDevAttrUnifiedAddressing,
-                                      device));
+#ifdef __CUDACC__
+    int hasUnifiedAddressing = 0;
+    CUDA_CHECK(hipDeviceGetAttribute(&hasUnifiedAddressing, hipDeviceAttributeUnifiedAddressing,
+                                     device));
     if (!hasUnifiedAddressing)
         LOG_FATAL("The selected GPU device (%d) does not support unified addressing.",
                   device);
+#endif
 
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 8192));
+    CUDA_CHECK(hipDeviceSetLimit(hipLimitStackSize, 8192));
     size_t stackSize;
-    CUDA_CHECK(cudaDeviceGetLimit(&stackSize, cudaLimitStackSize));
+    CUDA_CHECK(hipDeviceGetLimit(&stackSize, hipLimitStackSize));
     LOG_VERBOSE("Reset stack size to %d", stackSize);
 
-    CUDA_CHECK(cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 32 * 1024 * 1024));
+#ifdef __CUDACC__
+    CUDA_CHECK(hipDeviceSetLimit(hipLimitPrintfFifoSize, 32 * 1024 * 1024));
 
-    CUDA_CHECK(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
+    CUDA_CHECK(hipDeviceSetCacheConfig(hipFuncCachePreferL1));
+#endif
 
 #ifdef NVTX
 #ifdef PBRT_IS_WINDOWS
@@ -106,7 +110,7 @@ void GPUThreadInit() {
         return;
     int device = Options->gpuDevice ? *Options->gpuDevice : 0;
     LOG_VERBOSE("Selecting GPU device %d", device);
-    CUDA_CHECK(cudaSetDevice(device));
+    CUDA_CHECK(hipSetDevice(device));
 }
 
 void GPURegisterThread(const char *name) {
@@ -119,7 +123,7 @@ void GPURegisterThread(const char *name) {
 #endif
 }
 
-void GPUNameStream(cudaStream_t stream, const char *name) {
+void GPUNameStream(hipStream_t stream, const char *name) {
 #ifdef NVTX
     nvtxNameCuStream(stream, name);
 #endif
@@ -139,17 +143,17 @@ static std::vector<KernelStats *> kernelStats;
 
 struct ProfilerEvent {
     ProfilerEvent() {
-        CUDA_CHECK(cudaEventCreate(&start));
-        CUDA_CHECK(cudaEventCreate(&stop));
+        CUDA_CHECK(hipEventCreate(&start));
+        CUDA_CHECK(hipEventCreate(&stop));
     }
 
     void Sync() {
         CHECK(active);
-        CUDA_CHECK(cudaEventSynchronize(start));
-        CUDA_CHECK(cudaEventSynchronize(stop));
+        CUDA_CHECK(hipEventSynchronize(start));
+        CUDA_CHECK(hipEventSynchronize(stop));
 
         float ms = 0;
-        CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
+        CUDA_CHECK(hipEventElapsedTime(&ms, start, stop));
 
         ++stats->numLaunches;
         if (stats->numLaunches == 1)
@@ -163,7 +167,7 @@ struct ProfilerEvent {
         active = false;
     }
 
-    cudaEvent_t start, stop;
+    hipEvent_t start, stop;
     bool active = false;
     KernelStats *stats = nullptr;
 };
@@ -172,7 +176,7 @@ struct ProfilerEvent {
 static std::vector<ProfilerEvent> eventPool;
 static size_t eventPoolOffset = 0;
 
-std::pair<cudaEvent_t, cudaEvent_t> GetProfilerEvents(const char *description) {
+std::pair<hipEvent_t, hipEvent_t> GetProfilerEvents(const char *description) {
     if (eventPool.empty())
         eventPool.resize(1024);  // how many? This is probably more than we need...
 
@@ -201,15 +205,15 @@ std::pair<cudaEvent_t, cudaEvent_t> GetProfilerEvents(const char *description) {
 }
 
 void GPUWait() {
-    CUDA_CHECK(cudaDeviceSynchronize());
+    CUDA_CHECK(hipDeviceSynchronize());
 }
 
 void GPUMemset(void *ptr, int byte, size_t bytes) {
-    CUDA_CHECK(cudaMemset(ptr, byte, bytes));
+    CUDA_CHECK(hipMemset(ptr, byte, bytes));
 }
 
 void ReportKernelStats() {
-    CUDA_CHECK(cudaDeviceSynchronize());
+    CUDA_CHECK(hipDeviceSynchronize());
 
     // Drain active profiler events
     for (size_t i = 0; i < eventPool.size(); ++i)

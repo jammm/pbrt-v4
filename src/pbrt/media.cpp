@@ -150,7 +150,7 @@ bool GetMediumScatteringProperties(const std::string &name, Spectrum *sigma_a,
     return false;
 }
 
-bool Medium::IsEmissive() const {
+PBRT_CPU_GPU bool Medium::IsEmissive() const {
     auto is = [&](auto ptr) { return ptr->IsEmissive(); };
     return DispatchCPU(is);
 }

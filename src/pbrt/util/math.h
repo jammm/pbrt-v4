@@ -25,7 +25,7 @@
 
 namespace pbrt {
 
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && defined(__HIP_PLATFORM_NVIDIA__)
 
 #define ShadowEpsilon 0.0001f
 #define Pi Float(3.14159265358979323846)
@@ -471,7 +471,6 @@ PBRT_CPU_GPU inline float FastExp(float x) {
     bits &= 0b10000000011111111111111111111111u;
     bits |= (exponent + 127) << 23;
     return BitsToFloat(bits);
-
 #endif
 }
 
@@ -957,7 +956,7 @@ PBRT_CPU_GPU inline bool InRange(Interval a, Interval b) {
     return a.LowerBound() <= b.UpperBound() && a.UpperBound() >= b.LowerBound();
 }
 
-inline Interval Interval::operator/(Interval i) const {
+PBRT_CPU_GPU inline Interval Interval::operator/(Interval i) const {
     if (InRange(0, i))
         // The interval we're dividing by straddles zero, so just
         // return an interval of everything.
@@ -1384,7 +1383,7 @@ class SquareMatrix {
 
 // SquareMatrix Inline Methods
 template <int N>
-inline bool SquareMatrix<N>::IsIdentity() const {
+PBRT_CPU_GPU inline bool SquareMatrix<N>::IsIdentity() const {
     for (int i = 0; i < N; ++i)
         for (int j = 0; j < N; ++j) {
             if (i == j) {

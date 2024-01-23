@@ -38,6 +38,8 @@
 #ifndef FLIP_FLIP_H
 #define FLIP_FLIP_H
 
+#define M_PI                      3.14159265358979323846f
+
 struct FLIPOptions {
     float ppd = 0;
     float monitorDistance = 0.7f;

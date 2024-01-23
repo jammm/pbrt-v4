@@ -1,7 +1,3 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// The pbrt source code is licensed under the Apache License, Version 2.0.
-// SPDX: Apache-2.0
-
 #ifndef PBRT_PBRT_H
 #define PBRT_PBRT_H
 
@@ -18,11 +14,11 @@
 #endif  // PBRT_IS_WINDOWS
 
 // GPU Macro Definitions
-#if defined(__CUDA_ARCH__)
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
 #define PBRT_IS_GPU_CODE
 #endif
 
-#if defined(PBRT_BUILD_GPU_RENDERER) && defined(__CUDACC__)
+#if defined(PBRT_BUILD_GPU_RENDERER) && (defined(__CUDACC__) || defined(__HIPCC__))
 #ifndef PBRT_NOINLINE
 #define PBRT_NOINLINE __attribute__((noinline))
 #endif

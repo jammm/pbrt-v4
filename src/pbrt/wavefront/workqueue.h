@@ -33,6 +33,9 @@
 #include <cuda/atomic>
 #endif
 
+#elif defined(__HIP_PLATFORM_AMD__)
+#define PBRT_USE_LEGACY_CUDA_ATOMICS
+
 #endif  // __CUDACC__
 
 namespace pbrt {
