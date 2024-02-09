@@ -8,7 +8,7 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/gpu/memory.h>
-#include <pbrt/gpu/optix.h>
+#include <pbrt/gpu/optix/optix.h>
 #include <pbrt/scene.h>
 #include <pbrt/util/containers.h>
 #include <pbrt/util/pstd.h>

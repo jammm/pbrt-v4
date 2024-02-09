@@ -4,7 +4,7 @@
 
 #include <pbrt/util/color.h>
 
-#if defined(PBRT_BUILD_GPU_RENDERER)
+#if defined(PBRT_BUILD_GPU_RENDERER) && defined(__HIP_PLATFORM_AMD__)
 #include <hip/hip_runtime.h>
 #endif
 

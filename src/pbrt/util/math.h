@@ -25,7 +25,7 @@
 
 namespace pbrt {
 
-#if defined(PBRT_IS_GPU_CODE) && defined(__HIP_PLATFORM_NVIDIA__)
+#if defined(PBRT_IS_GPU_CODE) && defined(__NVCC__)
 
 #define ShadowEpsilon 0.0001f
 #define Pi Float(3.14159265358979323846)
