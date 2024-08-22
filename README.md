@@ -261,3 +261,4 @@ GPU architecture and ROCm version
 
 The instructions above assume the `gfx1100` architecture. You can specify other architectures via the CMake `AMDGPU_TARGETS` variable. You also need to change the architecture in `hiprt.sh` and `hiprt.bat`. 
 Note that PBRT must be compiled with the same version as HIPRT binaries (e.g., `hiprt02002_5.7_amd_lib_linux.bc`). If you use a different version of ROCm other than 5.7, you need to adjust it in `hiprt.sh` and `hiprt.bat`.
+
