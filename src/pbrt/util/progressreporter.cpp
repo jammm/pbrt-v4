@@ -46,7 +46,7 @@ ProgressReporter::ProgressReporter(int64_t totalWork, std::string title, bool qu
         gpuEventsFinishedOffset = 0;
 
         gpuEvents.resize(totalWork);
-        for (cudaEvent_t  &event : gpuEvents)
+        for (cudaEvent_t &event : gpuEvents)
             CUDA_CHECK(cudaEventCreate(&event));
     }
 #else

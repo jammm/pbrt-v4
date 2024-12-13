@@ -48,7 +48,7 @@ template <typename... Args>
 PBRT_CPU_GPU inline void LogFatal(LogLevel level, const char *file, int line,
                                   const char *fmt, Args &&...args);
 
-#ifndef __HIP_PLATFORM_AMD__
+#ifndef __HIPCC__
 PBRT_CPU_GPU void LogFatal(LogLevel level, const char *file, int line, const char *s);
 
 template <typename... Args>
@@ -128,7 +128,7 @@ PBRT_CPU_GPU inline void Log(LogLevel level, const char *file, int line, const c
 template <typename... Args>
 PBRT_CPU_GPU inline void LogFatal(LogLevel level, const char *file, int line,
                                   const char *fmt, Args &&...args) {
-#if defined(PBRT_IS_GPU_CODE) || defined(__HIP_PLATFORM_AMD__)
+#if defined(PBRT_IS_GPU_CODE) || defined(__HIPCC__)
     LogFatal(level, file, line, fmt);  // just the format string #yolo
 #else
     std::string s = StringPrintf(fmt, std::forward<Args>(args)...);

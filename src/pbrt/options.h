@@ -12,10 +12,6 @@
 
 #include <string>
 
-#ifdef __CUDACC__
-#include <cuda_runtime.h>
-#endif
-
 namespace pbrt {
 
 // RenderingCoordinateSystem Definition

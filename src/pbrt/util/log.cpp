@@ -121,10 +121,9 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
         ErrorExit("Invalid --log-level specified.");
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-    if (useGPU) {
+    if (useGPU) 
         CUDA_CHECK(cudaMemcpyToSymbol(LOGGING_LogLevelGPU, &logging::logLevel,
                                       sizeof(logging::logLevel)));
-    }
 #endif
 
     if (logUtilization) {
