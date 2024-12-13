@@ -20,7 +20,7 @@
 
 namespace pbrt {
 
-#if defined( PBRT_BUILD_GPU_RENDERER )
+#ifdef PBRT_BUILD_GPU_RENDERER
 
 class CUDAMemoryResource : public pstd::pmr::memory_resource {
     void *do_allocate(size_t size, size_t alignment);
@@ -50,6 +50,7 @@ class CUDATrackedMemoryResource : public CUDAMemoryResource {
     std::atomic<size_t> bytesAllocated{};
     std::unordered_map<void *, size_t> allocations;
 };
+
 #endif
 
 }  // namespace pbrt

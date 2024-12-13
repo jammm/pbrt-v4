@@ -8,19 +8,24 @@
 #include <pbrt/util/check.h>
 #include <pbrt/util/log.h>
 
-#include <hip/hip_runtime.h>
+#if defined(__HIPCC__)
+#include <pbrt/util/hip_aliases.h>
+#else
+#include <cuda.h>
+#include <cuda_runtime.h>
+#endif
 
 namespace pbrt {
 
 void *CUDAMemoryResource::do_allocate(size_t size, size_t alignment) {
     void *ptr;
-    CUDA_CHECK(hipMallocManaged(&ptr, size));
+    CUDA_CHECK(cudaMallocManaged(&ptr, size));
     CHECK_EQ(0, intptr_t(ptr) % alignment);
     return ptr;
 }
 
 void CUDAMemoryResource::do_deallocate(void *p, size_t bytes, size_t alignment) {
-    CUDA_CHECK(hipFree(p));
+    CUDA_CHECK(cudaFree(p));
 }
 
 void *CUDATrackedMemoryResource::do_allocate(size_t size, size_t alignment) {
@@ -28,7 +33,7 @@ void *CUDATrackedMemoryResource::do_allocate(size_t size, size_t alignment) {
         return nullptr;
 
     void *ptr;
-    CUDA_CHECK(hipMallocManaged(&ptr, size));
+    CUDA_CHECK(cudaMallocManaged(&ptr, size));
     DCHECK_EQ(0, intptr_t(ptr) % alignment);
 
     std::lock_guard<std::mutex> lock(mutex);
@@ -42,7 +47,7 @@ void CUDATrackedMemoryResource::do_deallocate(void *p, size_t size, size_t align
     if (!p)
         return;
 
-    CUDA_CHECK(hipFree(p));
+    CUDA_CHECK(cudaFree(p));
 
     std::lock_guard<std::mutex> lock(mutex);
     auto iter = allocations.find(p);
@@ -53,7 +58,7 @@ void CUDATrackedMemoryResource::do_deallocate(void *p, size_t size, size_t align
 
 void CUDATrackedMemoryResource::PrefetchToGPU() const {
     int deviceIndex;
-    CUDA_CHECK(hipGetDevice(&deviceIndex));
+    CUDA_CHECK(cudaGetDevice(&deviceIndex));
 
     std::lock_guard<std::mutex> lock(mutex);
 
@@ -61,14 +66,13 @@ void CUDATrackedMemoryResource::PrefetchToGPU() const {
     size_t bytes = 0;
     for (auto iter : allocations) {
         CUDA_CHECK(
-            hipMemPrefetchAsync(iter.first, iter.second, deviceIndex, 0 /* stream */));
+            cudaMemPrefetchAsync(iter.first, iter.second, deviceIndex, 0 /* stream */));
         bytes += iter.second;
     }
-    CUDA_CHECK(hipDeviceSynchronize());
+    CUDA_CHECK(cudaDeviceSynchronize());
     LOG_VERBOSE("Done prefetching: %d bytes total", bytes);
 }
 
-//#ifndef PBRT_IS_GPU_CODE
 CUDATrackedMemoryResource CUDATrackedMemoryResource::singleton;
-//#endif
+
 }  // namespace pbrt

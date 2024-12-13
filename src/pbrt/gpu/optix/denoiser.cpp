@@ -7,8 +7,8 @@
 #include <pbrt/gpu/memory.h>
 #include <pbrt/gpu/util.h>
 
-#include <hip/hip_runtime.h>
-#include <hip/hip_runtime.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <array>
 
 #include <optix.h>
@@ -31,8 +31,8 @@ namespace pbrt {
 
 Denoiser::Denoiser(Vector2i resolution, bool haveAlbedoAndNormal)
     : resolution(resolution), haveAlbedoAndNormal(haveAlbedoAndNormal) {
-    hipCtx_t cudaContext;
-    CUDA_CHECK(hipCtxGetCurrent(&cudaContext));
+    CUcontext cudaContext;
+    CU_CHECK(cuCtxGetCurrent(&cudaContext));
     CHECK(cudaContext != nullptr);
 
     OPTIX_CHECK(optixInit());
@@ -61,15 +61,15 @@ Denoiser::Denoiser(Vector2i resolution, bool haveAlbedoAndNormal)
     OPTIX_CHECK(optixDenoiserComputeMemoryResources(denoiserHandle, resolution.x,
                                                     resolution.y, &memorySizes));
 
-    CUDA_CHECK(hipMalloc(&denoiserState, memorySizes.stateSizeInBytes));
-    CUDA_CHECK(hipMalloc(&scratchBuffer, memorySizes.withoutOverlapScratchSizeInBytes));
+    CUDA_CHECK(cudaMalloc(&denoiserState, memorySizes.stateSizeInBytes));
+    CUDA_CHECK(cudaMalloc(&scratchBuffer, memorySizes.withoutOverlapScratchSizeInBytes));
 
     OPTIX_CHECK(optixDenoiserSetup(
         denoiserHandle, 0 /* stream */, resolution.x, resolution.y,
-        hipDeviceptr_t(denoiserState), memorySizes.stateSizeInBytes,
-        hipDeviceptr_t(scratchBuffer), memorySizes.withoutOverlapScratchSizeInBytes));
+        CUdeviceptr(denoiserState), memorySizes.stateSizeInBytes,
+        CUdeviceptr(scratchBuffer), memorySizes.withoutOverlapScratchSizeInBytes));
 
-    CUDA_CHECK(hipMalloc(&intensity, sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&intensity, sizeof(float)));
 }
 
 void Denoiser::Denoise(RGB *rgb, Normal3f *n, RGB *albedo, RGB *result) {
@@ -82,11 +82,11 @@ void Denoiser::Denoise(RGB *rgb, Normal3f *n, RGB *albedo, RGB *result) {
         inputLayers[i].pixelStrideInBytes = 0;
         inputLayers[i].format = OPTIX_PIXEL_FORMAT_FLOAT3;
     }
-    inputLayers[0].data = hipDeviceptr_t(rgb);
+    inputLayers[0].data = CUdeviceptr(rgb);
     if (haveAlbedoAndNormal) {
         CHECK(n != nullptr && albedo != nullptr);
-        inputLayers[1].data = hipDeviceptr_t(albedo);
-        inputLayers[2].data = hipDeviceptr_t(n);
+        inputLayers[1].data = CUdeviceptr(albedo);
+        inputLayers[2].data = CUdeviceptr(n);
     } else
         CHECK(n == nullptr && albedo == nullptr);
 
@@ -96,11 +96,11 @@ void Denoiser::Denoise(RGB *rgb, Normal3f *n, RGB *albedo, RGB *result) {
     outputImage.rowStrideInBytes = resolution.x * 3 * sizeof(float);
     outputImage.pixelStrideInBytes = 0;
     outputImage.format = OPTIX_PIXEL_FORMAT_FLOAT3;
-    outputImage.data = hipDeviceptr_t(result);
+    outputImage.data = CUdeviceptr(result);
 
     OPTIX_CHECK(optixDenoiserComputeIntensity(
-        denoiserHandle, 0 /* stream */, &inputLayers[0], hipDeviceptr_t(intensity),
-        hipDeviceptr_t(scratchBuffer), memorySizes.withoutOverlapScratchSizeInBytes));
+        denoiserHandle, 0 /* stream */, &inputLayers[0], CUdeviceptr(intensity),
+        CUdeviceptr(scratchBuffer), memorySizes.withoutOverlapScratchSizeInBytes));
 
     OptixDenoiserParams params = {};
 #if (OPTIX_VERSION >= 80000)
@@ -110,7 +110,7 @@ void Denoiser::Denoise(RGB *rgb, Normal3f *n, RGB *albedo, RGB *result) {
 #else
     params.denoiseAlpha = 0;
 #endif
-    params.hdrIntensity = hipDeviceptr_t(intensity);
+    params.hdrIntensity = CUdeviceptr(intensity);
     params.blendFactor = 0;  // TODO what should this be??
 
 #if (OPTIX_VERSION >= 70300)
@@ -125,15 +125,15 @@ void Denoiser::Denoise(RGB *rgb, Normal3f *n, RGB *albedo, RGB *result) {
     layers.output = outputImage;
 
     OPTIX_CHECK(optixDenoiserInvoke(
-        denoiserHandle, 0 /* stream */, &params, hipDeviceptr_t(denoiserState),
+        denoiserHandle, 0 /* stream */, &params, CUdeviceptr(denoiserState),
         memorySizes.stateSizeInBytes, &guideLayer, &layers, 1 /* # layers to denoise */,
-        0 /* offset x */, 0 /* offset y */, hipDeviceptr_t(scratchBuffer),
+        0 /* offset x */, 0 /* offset y */, CUdeviceptr(scratchBuffer),
         memorySizes.withoutOverlapScratchSizeInBytes));
 #else
     OPTIX_CHECK(optixDenoiserInvoke(
-        denoiserHandle, 0 /* stream */, &params, hipDeviceptr_t(denoiserState),
+        denoiserHandle, 0 /* stream */, &params, CUdeviceptr(denoiserState),
         memorySizes.stateSizeInBytes, inputLayers.data(), nLayers, 0 /* offset x */,
-        0 /* offset y */, &outputImage, hipDeviceptr_t(scratchBuffer),
+        0 /* offset y */, &outputImage, CUdeviceptr(scratchBuffer),
         memorySizes.withoutOverlapScratchSizeInBytes));
 #endif
 }

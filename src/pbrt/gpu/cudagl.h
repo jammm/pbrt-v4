@@ -34,9 +34,12 @@
 
 #include <glad/glad.h>
 
-#include <hip/hip_runtime.h>
-#ifdef __HIP_PLATFORM_NVIDIA__
+#if defined(__HIPCC__)
+#include <pbrt/util/hip_aliases.h>
+#else
+#include <cuda.h>
 #include <cuda_gl_interop.h>
+#include <cuda_runtime.h>
 #endif
 
 #define GL_CHECK(call)                                                   \
@@ -319,9 +322,9 @@ class CUDAOutputBuffer {
     void Unmap();
 
   private:
-    void setStream(hipStream_t stream) { m_stream = stream; }
+    void setStream(CUstream stream) { m_stream = stream; }
     // Allocate or update device pointer as necessary for CUDA access
-    void makeCurrent() { CUDA_CHECK(hipSetDevice(m_device_idx)); }
+    void makeCurrent() { CUDA_CHECK(cudaSetDevice(m_device_idx)); }
 
     // Get output buffer
     GLuint getPBO();
@@ -330,15 +333,15 @@ class CUDAOutputBuffer {
     int32_t m_width = 0u;
     int32_t m_height = 0u;
 
-    hipGraphicsResource *m_cuda_gfx_resource = nullptr;
+    cudaGraphicsResource *m_cuda_gfx_resource = nullptr;
     GLuint m_pbo = 0u;
     PIXEL_FORMAT *m_device_pixels = nullptr;
     PIXEL_FORMAT *m_host_pixels = nullptr;
 
     bool readbackActive = false;
-    hipEvent_t readbackFinishedEvent;
+    cudaEvent_t readbackFinishedEvent;
 
-    hipStream_t m_stream = 0u;
+    CUstream m_stream = 0u;
     int32_t m_device_idx = 0;
 
     BufferDisplay *display = nullptr;
@@ -350,14 +353,14 @@ CUDAOutputBuffer<PIXEL_FORMAT>::CUDAOutputBuffer(int32_t width, int32_t height) 
 
     // If using GL Interop, expect that the active device is also the display device.
     int current_device, is_display_device;
-    CUDA_CHECK(hipGetDevice(&current_device));
-    CUDA_CHECK(hipDeviceGetAttribute(&is_display_device, hipDeviceAttributeKernelExecTimeout,
+    CUDA_CHECK(cudaGetDevice(&current_device));
+    CUDA_CHECK(cudaDeviceGetAttribute(&is_display_device, cudaDevAttrKernelExecTimeout,
                                       current_device));
     if (getenv("XDG_SESSION_TYPE") == nullptr || getenv("XDG_SESSION_TYPE") != std::string("wayland")) {
         if (!is_display_device)
             LOG_FATAL("GL interop is only available on display device.");
     }
-    CUDA_CHECK(hipGetDevice(&m_device_idx));
+    CUDA_CHECK(cudaGetDevice(&m_device_idx));
 
     m_width = width;
     m_height = height;
@@ -371,24 +374,24 @@ CUDAOutputBuffer<PIXEL_FORMAT>::CUDAOutputBuffer(int32_t width, int32_t height) 
                           nullptr, GL_STREAM_DRAW));
     GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, 0u));
 
-#ifdef __HIP_PLATFORM_NVIDIA__
+#ifndef __HIPCC__
     CHECK(cudaGraphicsGLRegisterBuffer(&m_cuda_gfx_resource, m_pbo,
                                        cudaGraphicsMapFlagsWriteDiscard) == cudaSuccess);
 #else
     uint32_t num_gl_devices = 0;
 
-    hipDevice_t glDevice;
-    hipGLGetDevices(&num_gl_devices, &glDevice, 1, hipGLDeviceListAll);
+    int glDevice;
+    cudaGLGetDevices(&num_gl_devices, &glDevice, 1, cudaGLDeviceListAll);
 
-    if(glDevice != (hipDevice_t)current_device)
-        LOG_FATAL("HIP Multi-GPU not supported with GL interop yet");
+    if(glDevice != current_device)
+        LOG_FATAL("Multi-GPU not supported with GL interop yet");
 
-    CUDA_CHECK(hipGraphicsGLRegisterBuffer(&m_cuda_gfx_resource, m_pbo,
-                                           hipGraphicsRegisterFlagsWriteDiscard));
+    CUDA_CHECK(cudaGraphicsGLRegisterBuffer(&m_cuda_gfx_resource, m_pbo,
+                                            cudaGraphicsRegisterFlagsWriteDiscard));
 #endif
 
-    CUDA_CHECK(hipEventCreate(&readbackFinishedEvent));
-    CUDA_CHECK(hipHostMalloc(&m_host_pixels, m_width * m_height * sizeof(PIXEL_FORMAT)));
+    CUDA_CHECK(cudaEventCreate(&readbackFinishedEvent));
+    CUDA_CHECK(cudaMallocHost(&m_host_pixels, m_width * m_height * sizeof(PIXEL_FORMAT)));
 
     display = new BufferDisplay(BufferImageFormat::FLOAT3);
 }
@@ -410,8 +413,8 @@ PIXEL_FORMAT* CUDAOutputBuffer<PIXEL_FORMAT>::Map() {
     makeCurrent();
 
     size_t buffer_size = 0u;
-    CUDA_CHECK(hipGraphicsMapResources(1, &m_cuda_gfx_resource, m_stream));
-    CUDA_CHECK(hipGraphicsResourceGetMappedPointer(
+    CUDA_CHECK(cudaGraphicsMapResources(1, &m_cuda_gfx_resource, m_stream));
+    CUDA_CHECK(cudaGraphicsResourceGetMappedPointer(
         reinterpret_cast<void**>(&m_device_pixels), &buffer_size, m_cuda_gfx_resource));
 
     return m_device_pixels;
@@ -421,7 +424,7 @@ template <typename PIXEL_FORMAT>
 void CUDAOutputBuffer<PIXEL_FORMAT>::Unmap() {
     makeCurrent();
 
-    CUDA_CHECK(hipGraphicsUnmapResources(1, &m_cuda_gfx_resource, m_stream));
+    CUDA_CHECK(cudaGraphicsUnmapResources(1, &m_cuda_gfx_resource, m_stream));
 }
 
 template <typename PIXEL_FORMAT>
@@ -444,10 +447,10 @@ void CUDAOutputBuffer<PIXEL_FORMAT>::StartAsynchronousReadback() {
 
     makeCurrent();
 
-    CUDA_CHECK(hipMemcpyAsync(m_host_pixels, m_device_pixels,
+    CUDA_CHECK(cudaMemcpyAsync(m_host_pixels, m_device_pixels,
                                m_width * m_height * sizeof(PIXEL_FORMAT),
-                               hipMemcpyDeviceToHost));
-    CUDA_CHECK(hipEventRecord(readbackFinishedEvent));
+                              cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaEventRecord(readbackFinishedEvent));
     readbackActive = true;
 }
 
@@ -458,7 +461,7 @@ const PIXEL_FORMAT *CUDAOutputBuffer<PIXEL_FORMAT>::GetReadbackPixels() {
 
     makeCurrent();
 
-    CUDA_CHECK(hipEventSynchronize(readbackFinishedEvent));
+    CUDA_CHECK(cudaEventSynchronize(readbackFinishedEvent));
     readbackActive = false;
     return m_host_pixels;
 }
