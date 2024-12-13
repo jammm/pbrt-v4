@@ -22,7 +22,7 @@
 #include <pbrt/util/hip_aliases.h>
 #else
 #include <cuda.h>
-#include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
 #endif
 
 #ifdef NVTX

@@ -6,6 +6,7 @@
 
 #define cudaError_t hipError_t
 #define cudaSuccess hipSuccess
+#define cudaErrorNotReady hipErrorNotReady
 #define cudaGetLastError hipGetLastError
 #define cudaGetErrorString hipGetErrorString
 
@@ -46,6 +47,7 @@
 #define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define cudaMemcpyHostToDevice hipMemcpyHostToDevice
 #define cudaMemcpyToSymbol hipMemcpyToSymbol
+#define cudaMemcpyFromSymbol hipMemcpyFromSymbol
 #define cudaMemPrefetchAsync hipMemPrefetchAsync
 #define cudaMemset hipMemset
 
@@ -84,6 +86,7 @@
 #define cudaEventRecord hipEventRecord
 #define cudaEventElapsedTime hipEventElapsedTime
 #define cudaEventSynchronize hipEventSynchronize
+#define cudaEventQuery hipEventQuery
 
 #define CUstream hipStream_t
 #define cudaStream_t hipStream_t

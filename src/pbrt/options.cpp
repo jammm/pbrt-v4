@@ -3,7 +3,6 @@
 // SPDX: Apache-2.0
 
 #include <pbrt/options.h>
-#include <pbrt/shapes.h>
 
 #if defined(PBRT_BUILD_GPU_RENDERER)
 #include <pbrt/gpu/util.h>

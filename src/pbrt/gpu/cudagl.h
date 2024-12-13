@@ -449,7 +449,7 @@ void CUDAOutputBuffer<PIXEL_FORMAT>::StartAsynchronousReadback() {
 
     CUDA_CHECK(cudaMemcpyAsync(m_host_pixels, m_device_pixels,
                                m_width * m_height * sizeof(PIXEL_FORMAT),
-                              cudaMemcpyDeviceToHost));
+                               cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaEventRecord(readbackFinishedEvent));
     readbackActive = true;
 }

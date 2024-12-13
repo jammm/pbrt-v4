@@ -1066,7 +1066,7 @@ static TextureArray createSingleChannelTextureArray(
 
     for (int level = 0; level < mipmap.Levels(); ++level) {
         const Image &levelImage = mipmap.GetLevel(level);
-        cudaArray_t  levelArray;
+        cudaArray_t levelArray;
         CUDA_CHECK(cudaGetMipmappedArrayLevel(&levelArray, texArray, level));
 
         int pitch;
@@ -1273,7 +1273,7 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
 
                         for (int level = 0; level < mipmap.Levels(); ++level) {
                             const Image &levelImage = mipmap.GetLevel(level);
-                            cudaArray_t  levelArray;
+                            cudaArray_t levelArray;
                             CUDA_CHECK(
                                 cudaGetMipmappedArrayLevel(&levelArray, texArray, level));
 
@@ -1333,7 +1333,7 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
 
                         for (int level = 0; level < mipmap.Levels(); ++level) {
                             const Image &levelImage = mipmap.GetLevel(level);
-                            cudaArray_t  levelArray;
+                            cudaArray_t levelArray;
                             CUDA_CHECK(
                                 cudaGetMipmappedArrayLevel(&levelArray, texArray, level));
 
@@ -1435,7 +1435,7 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
     // Initialize _ImageTexture_ parameters
     Float maxAniso = parameters.GetOneFloat("maxanisotropy", 8.f);
     std::string filter = parameters.GetOneString("filter", "bilinear");
-    MIPMapFilterOptions filterOptions; // not used
+    MIPMapFilterOptions filterOptions;
     filterOptions.maxAnisotropy = maxAniso;
     pstd::optional<FilterFunction> ff = ParseFilter(filter);
     if (ff)
