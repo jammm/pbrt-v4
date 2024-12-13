@@ -952,7 +952,7 @@ if(PBRT_CUDA_ENABLED)
 endif()
 
 if(PBRT_HIP_ENABLED)
-  list(APPEND ALL_PBRT_LIBS "hiprt0200264")
+  list(APPEND ALL_PBRT_LIBS "hiprt0200464")
   if(CMAKE_SYSTEM_NAME STREQUAL Windows)
     add_custom_target(
         libdeflate_msvc_patch
