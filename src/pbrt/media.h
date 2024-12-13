@@ -24,10 +24,6 @@
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/GridHandle.h>
 #include <nanovdb/util/SampleFromVoxels.h>
-// Not used
-//#ifdef PBRT_BUILD_GPU_RENDERER
-//#include <nanovdb/util/CudaDeviceBuffer.h>
-//#endif  // PBRT_BUILD_GPU_RENDERER
 
 #include <algorithm>
 #include <limits>

@@ -12,7 +12,7 @@
 
 #include <string>
 
-#ifdef __HIP_PLATFORM_NVIDIA__
+#ifdef __CUDACC__
 #include <cuda_runtime.h>
 #endif
 

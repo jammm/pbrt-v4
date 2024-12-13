@@ -984,22 +984,22 @@ WrinkledTexture *WrinkledTexture::Create(const Transform &renderFromTexture,
 
 #if defined(PBRT_BUILD_GPU_RENDERER)
 
-#ifdef __HIP_PLATFORM_AMD__
-using HipTextureArray = hipArray_t;
+#ifdef __HIPCC__
+using TextureArray = cudaArray_t;
 #else
-using HipTextureArray = hipMipmappedArray_t;
+using TextureArray = cudaMipmappedArray_t;
 #endif
 
 struct LuminanceTextureCacheItem {
-    HipTextureArray texArray;
-    hipTextureReadMode readMode;
+    TextureArray texArray;
+    cudaTextureReadMode readMode;
     int nMIPMapLevels;
     bool originallySingleChannel;
 };
 
 struct RGBTextureCacheItem {
-    HipTextureArray texArray;
-    hipTextureReadMode readMode;
+    TextureArray texArray;
+    cudaTextureReadMode readMode;
     int nMIPMapLevels;
     const RGBColorSpace *colorSpace;
 };
@@ -1010,21 +1010,21 @@ static std::map<std::string, RGBTextureCacheItem> rgbTextureCache;
 
 STAT_MEMORY_COUNTER("Memory/ImageTextures", gpuImageTextureBytes);
 
-static HipTextureArray createSingleChannelTextureArray(
+static TextureArray createSingleChannelTextureArray(
     const Image &image, const RGBColorSpace *colorSpace, int *nMIPMapLevels) {
     CHECK_EQ(1, image.NChannels());
-    HipTextureArray texArray;
+    TextureArray texArray;
 
-    hipChannelFormatDesc channelDesc;
+    cudaChannelFormatDesc channelDesc;
     switch (image.Format()) {
     case PixelFormat::U256:
-        channelDesc = hipCreateChannelDesc(8, 0, 0, 0, hipChannelFormatKindUnsigned);
+        channelDesc = cudaCreateChannelDesc(8, 0, 0, 0, cudaChannelFormatKindUnsigned);
         break;
     case PixelFormat::Half:
-        channelDesc = hipCreateChannelDesc(16, 0, 0, 0, hipChannelFormatKindFloat);
+        channelDesc = cudaCreateChannelDesc(16, 0, 0, 0, cudaChannelFormatKindFloat);
         break;
     case PixelFormat::Float:
-        channelDesc = hipCreateChannelDesc(32, 0, 0, 0, hipChannelFormatKindFloat);
+        channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
         break;
     default:
         LOG_FATAL("Unhandled PixelFormat");
@@ -1035,10 +1035,10 @@ static HipTextureArray createSingleChannelTextureArray(
     *nMIPMapLevels = mipmap.Levels();
 
     const Image &baseImage = mipmap.GetLevel(0);
-    hipExtent extent =
-        make_hipExtent(baseImage.Resolution().x, baseImage.Resolution().y, 0);
+    cudaExtent extent =
+        make_cudaExtent(baseImage.Resolution().x, baseImage.Resolution().y, 0);
 
-#ifdef __HIP_PLATFORM_AMD__
+#ifdef __HIPCC__
     int pitch;
     switch (image.Format()) {
     case PixelFormat::U256:
@@ -1056,18 +1056,18 @@ static HipTextureArray createSingleChannelTextureArray(
 
     gpuImageTextureBytes += pitch * baseImage.Resolution().y;
 
-    CUDA_CHECK(hipMallocArray(&texArray, &channelDesc, extent.width, extent.height));
-    CUDA_CHECK(hipMemcpy2DToArray(texArray, /* offset */ 0, 0,
+    CUDA_CHECK(cudaMallocArray(&texArray, &channelDesc, extent.width, extent.height));
+    CUDA_CHECK(cudaMemcpy2DToArray(texArray, /* offset */ 0, 0,
                                   baseImage.RawPointer({0, 0}), pitch, pitch,
-                                  baseImage.Resolution().y, hipMemcpyHostToDevice));
+                                  baseImage.Resolution().y, cudaMemcpyHostToDevice));
 #else
-    CUDA_CHECK(hipMallocMipmappedArray(&texArray, &channelDesc, extent, mipmap.Levels(),
+    CUDA_CHECK(cudaMallocMipmappedArray(&texArray, &channelDesc, extent, mipmap.Levels(),
                                         0 /* flags */));
 
     for (int level = 0; level < mipmap.Levels(); ++level) {
         const Image &levelImage = mipmap.GetLevel(level);
-        hipArray_t levelArray;
-        CUDA_CHECK(hipGetMipmappedArrayLevel(&levelArray, texArray, level));
+        cudaArray_t  levelArray;
+        CUDA_CHECK(cudaGetMipmappedArrayLevel(&levelArray, texArray, level));
 
         int pitch;
         switch (image.Format()) {
@@ -1086,22 +1086,22 @@ static HipTextureArray createSingleChannelTextureArray(
 
         gpuImageTextureBytes += pitch * levelImage.Resolution().y;
 
-        CUDA_CHECK(hipMemcpy2DToArray(
+        CUDA_CHECK(cudaMemcpy2DToArray(
             levelArray, /* offset */ 0, 0, levelImage.RawPointer({0, 0}), pitch, pitch,
-            levelImage.Resolution().y, hipMemcpyHostToDevice));
+            levelImage.Resolution().y, cudaMemcpyHostToDevice));
     }
 #endif
 
     return texArray;
 }
 
-static hipTextureAddressMode convertAddressMode(const std::string &mode) {
+static cudaTextureAddressMode convertAddressMode(const std::string &mode) {
     if (mode == "repeat")
-        return hipAddressModeWrap;
+        return cudaAddressModeWrap;
     else if (mode == "clamp")
-        return hipAddressModeClamp;
+        return cudaAddressModeClamp;
     else if (mode == "black")
-        return hipAddressModeBorder;
+        return cudaAddressModeBorder;
     else
         ErrorExit("%s: texture wrap mode not supported", mode);
 }
@@ -1133,9 +1133,9 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
     ColorEncoding encoding = ColorEncoding::Get(encodingString, alloc);
 
     // These have to be initialized one way or another in the below
-    HipTextureArray texArray;
+    TextureArray texArray;
     int nMIPMapLevels = 0;
-    hipTextureReadMode readMode;
+    cudaTextureReadMode readMode;
     const RGBColorSpace *colorSpace = nullptr;
     bool isSingleChannel = false;
 
@@ -1168,8 +1168,8 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
                 Image &image = immeta.image;
 
                 readMode = image.Format() == PixelFormat::U256
-                               ? hipReadModeNormalizedFloat
-                               : hipReadModeElementType;
+                               ? cudaReadModeNormalizedFloat
+                               : cudaReadModeElementType;
                 colorSpace = immeta.metadata.GetColorSpace();
 
                 ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
@@ -1183,12 +1183,12 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
 
                     switch (image.Format()) {
                     case PixelFormat::U256: {
-                        hipChannelFormatDesc channelDesc = hipCreateChannelDesc(
-                            8, 8, 8, 8, hipChannelFormatKindUnsigned);
+                        cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(
+                            8, 8, 8, 8, cudaChannelFormatKindUnsigned);
 
-                        hipExtent extent = make_hipExtent(baseImage.Resolution().x,
+                        cudaExtent extent = make_cudaExtent(baseImage.Resolution().x,
                                                             baseImage.Resolution().y, 0);
-#ifdef __HIP_PLATFORM_AMD__
+#ifdef __HIPCC__
                         std::vector<uint8_t> rgba(4 * baseImage.Resolution().x *
                                                   baseImage.Resolution().y);
                         size_t offset = 0;
@@ -1203,20 +1203,20 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
                         int pitch = baseImage.Resolution().x * 4 * sizeof(uint8_t);
                         gpuImageTextureBytes += pitch * baseImage.Resolution().y;
 
-                        CUDA_CHECK(hipMallocArray(&texArray, &channelDesc, extent.width,
+                        CUDA_CHECK(cudaMallocArray(&texArray, &channelDesc, extent.width,
                                                   extent.height));
-                        CUDA_CHECK(hipMemcpy2DToArray(
+                        CUDA_CHECK(cudaMemcpy2DToArray(
                             texArray, /* offset */ 0, 0, rgba.data(), pitch, pitch,
-                            baseImage.Resolution().y, hipMemcpyHostToDevice));
+                            baseImage.Resolution().y, cudaMemcpyHostToDevice));
 #else
-                        CUDA_CHECK(hipMallocMipmappedArray(&texArray, &channelDesc,
+                        CUDA_CHECK(cudaMallocMipmappedArray(&texArray, &channelDesc,
                                                             extent, mipmap.Levels(),
                                                             0 /* flags */));
                         for (int level = 0; level < mipmap.Levels(); ++level) {
                             const Image &levelImage = mipmap.GetLevel(level);
-                            hipArray_t levelArray;
+                            cudaArray_t levelArray;
                             CUDA_CHECK(
-                                hipGetMipmappedArrayLevel(&levelArray, texArray, level));
+                                cudaGetMipmappedArrayLevel(&levelArray, texArray, level));
 
                             std::vector<uint8_t> rgba(4 * levelImage.Resolution().x *
                                                       levelImage.Resolution().y);
@@ -1232,21 +1232,21 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
                             int pitch = levelImage.Resolution().x * 4 * sizeof(uint8_t);
                             gpuImageTextureBytes += pitch * levelImage.Resolution().y;
 
-                            CUDA_CHECK(hipMemcpy2DToArray(
+                            CUDA_CHECK(cudaMemcpy2DToArray(
                                 levelArray,
                                 /* offset */ 0, 0, rgba.data(), pitch, pitch,
-                                levelImage.Resolution().y, hipMemcpyHostToDevice));
+                                levelImage.Resolution().y, cudaMemcpyHostToDevice));
                         }
 #endif
                         break;
                     }
                     case PixelFormat::Half: {
-                        hipChannelFormatDesc channelDesc = hipCreateChannelDesc(
-                            16, 16, 16, 16, hipChannelFormatKindFloat);
+                        cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(
+                            16, 16, 16, 16, cudaChannelFormatKindFloat);
 
-                        hipExtent extent = make_hipExtent(baseImage.Resolution().x,
+                        cudaExtent extent = make_cudaExtent(baseImage.Resolution().x,
                                                             baseImage.Resolution().y, 0);
-#ifdef __HIP_PLATFORM_AMD__
+#ifdef __HIPCC__
                         std::vector<Half> rgba(4 * baseImage.Resolution().x *
                                                baseImage.Resolution().y);
                         size_t offset = 0;
@@ -1261,21 +1261,21 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
                         int pitch = baseImage.Resolution().x * 4 * sizeof(Half);
                         gpuImageTextureBytes += pitch * baseImage.Resolution().y;
 
-                        CUDA_CHECK(hipMallocArray(&texArray, &channelDesc, extent.width,
+                        CUDA_CHECK(cudaMallocArray(&texArray, &channelDesc, extent.width,
                                                   extent.height));
-                        CUDA_CHECK(hipMemcpy2DToArray(
+                        CUDA_CHECK(cudaMemcpy2DToArray(
                             texArray, /* offset */ 0, 0, rgba.data(), pitch, pitch,
-                            baseImage.Resolution().y, hipMemcpyHostToDevice));
+                            baseImage.Resolution().y, cudaMemcpyHostToDevice));
 #else
-                        CUDA_CHECK(hipMallocMipmappedArray(&texArray, &channelDesc,
+                        CUDA_CHECK(cudaMallocMipmappedArray(&texArray, &channelDesc,
                                                             extent, mipmap.Levels(),
                                                             0 /* flags */));
 
                         for (int level = 0; level < mipmap.Levels(); ++level) {
                             const Image &levelImage = mipmap.GetLevel(level);
-                            hipArray_t levelArray;
+                            cudaArray_t  levelArray;
                             CUDA_CHECK(
-                                hipGetMipmappedArrayLevel(&levelArray, texArray, level));
+                                cudaGetMipmappedArrayLevel(&levelArray, texArray, level));
 
                             std::vector<Half> rgba(4 * levelImage.Resolution().x *
                                                    levelImage.Resolution().y);
@@ -1292,21 +1292,21 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
                             int pitch = levelImage.Resolution().x * 4 * sizeof(Half);
                             gpuImageTextureBytes += pitch * levelImage.Resolution().y;
 
-                            CUDA_CHECK(hipMemcpy2DToArray(
+                            CUDA_CHECK(cudaMemcpy2DToArray(
                                 levelArray,
                                 /* offset */ 0, 0, rgba.data(), pitch, pitch,
-                                levelImage.Resolution().y, hipMemcpyHostToDevice));
+                                levelImage.Resolution().y, cudaMemcpyHostToDevice));
                         }
 #endif
                         break;
                     }
                     case PixelFormat::Float: {
-                        hipChannelFormatDesc channelDesc = hipCreateChannelDesc(
-                            32, 32, 32, 32, hipChannelFormatKindFloat);
+                        cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(
+                            32, 32, 32, 32, cudaChannelFormatKindFloat);
 
-                        hipExtent extent = make_hipExtent(baseImage.Resolution().x,
+                        cudaExtent extent = make_cudaExtent(baseImage.Resolution().x,
                                                             baseImage.Resolution().y, 0);
-#ifdef __HIP_PLATFORM_AMD__
+#ifdef __HIPCC__
                         std::vector<float> rgba(4 * baseImage.Resolution().x *
                                                 baseImage.Resolution().y);
 
@@ -1321,21 +1321,21 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
                         int pitch = baseImage.Resolution().x * 4 * sizeof(float);
                         gpuImageTextureBytes += pitch * baseImage.Resolution().y;
 
-                        CUDA_CHECK(hipMallocArray(&texArray, &channelDesc, extent.width,
+                        CUDA_CHECK(cudaMallocArray(&texArray, &channelDesc, extent.width,
                                                   extent.height));
-                        CUDA_CHECK(hipMemcpy2DToArray(
+                        CUDA_CHECK(cudaMemcpy2DToArray(
                             texArray, /* offset */ 0, 0, rgba.data(), pitch, pitch,
-                            baseImage.Resolution().y, hipMemcpyHostToDevice));
+                            baseImage.Resolution().y, cudaMemcpyHostToDevice));
 #else
-                        CUDA_CHECK(hipMallocMipmappedArray(&texArray, &channelDesc,
+                        CUDA_CHECK(cudaMallocMipmappedArray(&texArray, &channelDesc,
                                                             extent, mipmap.Levels(),
                                                             0 /* flags */));
 
                         for (int level = 0; level < mipmap.Levels(); ++level) {
                             const Image &levelImage = mipmap.GetLevel(level);
-                            hipArray_t levelArray;
+                            cudaArray_t  levelArray;
                             CUDA_CHECK(
-                                hipGetMipmappedArrayLevel(&levelArray, texArray, level));
+                                cudaGetMipmappedArrayLevel(&levelArray, texArray, level));
 
                             std::vector<float> rgba(4 * levelImage.Resolution().x *
                                                     levelImage.Resolution().y);
@@ -1351,10 +1351,10 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
                             int pitch = levelImage.Resolution().x * 4 * sizeof(float);
                             gpuImageTextureBytes += pitch * levelImage.Resolution().y;
 
-                            CUDA_CHECK(hipMemcpy2DToArray(
+                            CUDA_CHECK(cudaMemcpy2DToArray(
                                 levelArray,
                                 /* offset */ 0, 0, rgba.data(), pitch, pitch,
-                                levelImage.Resolution().y, hipMemcpyHostToDevice));
+                                levelImage.Resolution().y, cudaMemcpyHostToDevice));
                         }
 #endif
                         break;
@@ -1384,36 +1384,36 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
         }
     }
 
-    hipResourceDesc resDesc = {};
-#ifdef __HIP_PLATFORM_AMD__
-    resDesc.resType = hipResourceTypeArray;
+    cudaResourceDesc resDesc = {};
+#ifdef __HIPCC__
+    resDesc.resType = cudaResourceTypeArray;
     resDesc.res.array.array = texArray;
 #else
-    resDesc.resType = hipResourceTypeMipmappedArray;
+    resDesc.resType = cudaResourceTypeMipmappedArray;
     resDesc.res.mipmap.mipmap = texArray;
 #endif
 
-    hipTextureDesc texDesc = {};
+    cudaTextureDesc texDesc = {};
     texDesc.addressMode[0] = convertAddressMode(wrapString);
     texDesc.addressMode[1] = convertAddressMode(wrapString);
-    texDesc.filterMode = filter == "point" ? hipFilterModePoint : hipFilterModeLinear;
+    texDesc.filterMode = filter == "point" ? cudaFilterModePoint : cudaFilterModeLinear;
     texDesc.readMode = readMode;
     texDesc.normalizedCoords = 1;
-#ifndef __HIP_PLATFORM_AMD__
+#ifndef __HIPCC__
     texDesc.maxAnisotropy = Clamp(maxAniso, 1, 16);
     texDesc.maxMipmapLevelClamp = nMIPMapLevels - 1;
     texDesc.minMipmapLevelClamp = 0;
     texDesc.mipmapFilterMode =
         (filter == "trilinear" || filter == "ewa" || filter == "EWA")
-            ? hipFilterModeLinear
-            : hipFilterModePoint;
+            ? cudaFilterModeLinear
+            : cudaFilterModePoint;
 #endif
     texDesc.borderColor[0] = texDesc.borderColor[1] = texDesc.borderColor[2] =
         texDesc.borderColor[3] = 0.f;
     texDesc.sRGB = 1;
 
-    hipTextureObject_t texObj;
-    CUDA_CHECK(hipCreateTextureObject(&texObj, &resDesc, &texDesc, nullptr));
+    cudaTextureObject_t texObj;
+    CUDA_CHECK(cudaCreateTextureObject(&texObj, &resDesc, &texDesc, nullptr));
 
     TextureMapping2D mapping =
         TextureMapping2D::Create(parameters, renderFromTexture, loc, alloc);
@@ -1455,9 +1455,9 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
     std::string encodingString = parameters.GetOneString("encoding", defaultEncoding);
     ColorEncoding encoding = ColorEncoding::Get(encodingString, alloc);
 
-    HipTextureArray texArray;
+    TextureArray texArray;
     int nMIPMapLevels = 0;
-    hipTextureReadMode readMode;
+    cudaTextureReadMode readMode;
 
     textureCacheMutex.lock();
     auto iter = lumTextureCache.find(filename);
@@ -1507,8 +1507,8 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
         }
 
         texArray = createSingleChannelTextureArray(image, colorSpace, &nMIPMapLevels);
-        readMode = (image.Format() == PixelFormat::U256) ? hipReadModeNormalizedFloat
-                                                         : hipReadModeElementType;
+        readMode = (image.Format() == PixelFormat::U256) ? cudaReadModeNormalizedFloat
+                                                         : cudaReadModeElementType;
 
         textureCacheMutex.lock();
         lumTextureCache[filename] =
@@ -1516,36 +1516,36 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
         textureCacheMutex.unlock();
     }
 
-    hipResourceDesc resDesc = {};
-#ifdef __HIP_PLATFORM_AMD__
-    resDesc.resType = hipResourceTypeArray;
+    cudaResourceDesc resDesc = {};
+#ifdef __HIPCC__
+    resDesc.resType = cudaResourceTypeArray;
     resDesc.res.array.array = texArray;
 #else
-    resDesc.resType = hipResourceTypeMipmappedArray;
+    resDesc.resType = cudaResourceTypeMipmappedArray;
     resDesc.res.mipmap.mipmap = texArray;
 #endif
 
-    hipTextureDesc texDesc = {};
+    cudaTextureDesc texDesc = {};
     texDesc.addressMode[0] = convertAddressMode(wrapString);
     texDesc.addressMode[1] = convertAddressMode(wrapString);
-    texDesc.filterMode = filter == "point" ? hipFilterModePoint : hipFilterModeLinear;
+    texDesc.filterMode = filter == "point" ? cudaFilterModePoint : cudaFilterModeLinear;
     texDesc.readMode = readMode;
     texDesc.normalizedCoords = 1;
-#ifndef __HIP_PLATFORM_AMD__
+#ifndef __HIPCC__
     texDesc.maxAnisotropy = Clamp(maxAniso, 1, 16);
     texDesc.maxMipmapLevelClamp = nMIPMapLevels - 1;
     texDesc.minMipmapLevelClamp = 0;
     texDesc.mipmapFilterMode =
         (filter == "trilinear" || filter == "ewa" || filter == "EWA")
-            ? hipFilterModeLinear
-            : hipFilterModePoint;
+            ? cudaFilterModeLinear
+            : cudaFilterModePoint;
 #endif
     texDesc.borderColor[0] = texDesc.borderColor[1] = texDesc.borderColor[2] =
         texDesc.borderColor[3] = 0.f;
     texDesc.sRGB = 1;
 
-    hipTextureObject_t texObj;
-    CUDA_CHECK(hipCreateTextureObject(&texObj, &resDesc, &texDesc, nullptr));
+    cudaTextureObject_t texObj;
+    CUDA_CHECK(cudaCreateTextureObject(&texObj, &resDesc, &texDesc, nullptr));
 
     TextureMapping2D mapping =
         TextureMapping2D::Create(parameters, renderFromTexture, loc, alloc);

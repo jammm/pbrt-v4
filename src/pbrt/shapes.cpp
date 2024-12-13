@@ -26,7 +26,11 @@
 #include <pbrt/util/stats.h>
 
 #if defined(PBRT_BUILD_GPU_RENDERER)
-#include <hip/hip_runtime.h>
+#if defined(__HIPCC__)
+#include <pbrt/util/hip_aliases.h>
+#else
+#include <cuda.h>
+#endif
 #endif
 
 #include <algorithm>
@@ -161,8 +165,8 @@ void Triangle::Init(Allocator alloc) {
     allMeshes = alloc.new_object<pstd::vector<const TriangleMesh *>>(alloc);
 #if defined(PBRT_BUILD_GPU_RENDERER)
     if (Options->useGPU)
-        CUDA_CHECK(hipMemcpyToSymbol((const void *)&allTriangleMeshesGPU,
-                                     (const void *)&allMeshes, sizeof(allMeshes)));
+        CUDA_CHECK(
+            cudaMemcpyToSymbol(allTriangleMeshesGPU, &allMeshes, sizeof(allMeshes)));
 #endif
 }
 
@@ -1030,9 +1034,8 @@ void BilinearPatch::Init(Allocator alloc) {
     allMeshes = alloc.new_object<pstd::vector<const BilinearPatchMesh *>>(alloc);
 #if defined(PBRT_BUILD_GPU_RENDERER)
     if (Options->useGPU)
-        CUDA_CHECK(hipMemcpyToSymbol((const void *)&allBilinearMeshesGPU,
-                                     (const void *)&allMeshes,
-                                     sizeof(allMeshes)));
+        CUDA_CHECK(
+            cudaMemcpyToSymbol(allBilinearMeshesGPU, &allMeshes, sizeof(allMeshes)));
 #endif
 }
 

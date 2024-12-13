@@ -45,8 +45,39 @@
 #define cudaMemcpyAsync hipMemcpyAsync
 #define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define cudaMemcpyHostToDevice hipMemcpyHostToDevice
+#define cudaMemcpyToSymbol hipMemcpyToSymbol
 #define cudaMemPrefetchAsync hipMemPrefetchAsync
 #define cudaMemset hipMemset
+
+#define cudaArray_t hipArray_t
+#define cudaMallocArray hipMallocArray
+#define cudaMemcpy2DToArray hipMemcpy2DToArray
+#define cudaMipmappedArray_t  hipMipmappedArray_t
+#define cudaMallocMipmappedArray hipMallocMipmappedArray
+#define cudaGetMipmappedArrayLevel hipGetMipmappedArrayLevel
+
+#define cudaExtent hipExtent
+#define make_cudaExtent make_hipExtent
+
+#define cudaTextureObject_t hipTextureObject_t
+#define cudaCreateTextureObject hipCreateTextureObject
+#define cudaChannelFormatDesc hipChannelFormatDesc
+#define cudaCreateChannelDesc hipCreateChannelDesc
+#define cudaChannelFormatKindUnsigned hipChannelFormatKindUnsigned
+#define cudaChannelFormatKindFloat hipChannelFormatKindFloat
+#define cudaFilterModePoint hipFilterModePoint
+#define cudaFilterModeLinear hipFilterModeLinear
+#define cudaTextureDesc hipTextureDesc
+#define cudaTextureAddressMode hipTextureAddressMode
+#define cudaTextureReadMode hipTextureReadMode
+#define cudaAddressModeWrap hipAddressModeWrap
+#define cudaAddressModeClamp hipAddressModeClamp
+#define cudaAddressModeBorder hipAddressModeBorder
+#define cudaReadModeNormalizedFloat hipReadModeNormalizedFloat
+#define cudaReadModeElementType hipReadModeElementType
+#define cudaResourceDesc hipResourceDesc
+#define cudaResourceTypeArray hipResourceTypeArray
+#define cudaResourceTypeMipmappedArray hipResourceTypeMipmappedArray
 
 #define cudaEvent_t hipEvent_t
 #define cudaEventCreate hipEventCreate

@@ -18,8 +18,7 @@ PBRTOptions *Options;
 PBRT_GPU __constant__ BasicPBRTOptions OptionsGPU;
 
 void CopyOptionsToGPU() {
-    CUDA_CHECK(hipMemcpyToSymbol((const void *)&OptionsGPU, (const void *)Options,
-                                 sizeof(OptionsGPU)));
+    CUDA_CHECK(cudaMemcpyToSymbol(OptionsGPU, Options, sizeof(OptionsGPU)));
 }
 #endif
 

@@ -24,8 +24,10 @@
 #include <mutex>
 #include <string>
 
-#if defined(__CUDACC__) || defined(__HIPCC__)
-#include <hip/hip_runtime_api.h>
+#if defined(__HIPCC__)
+#include <pbrt/util/hip_aliases.h>
+#elif defined(__CUDACC__)
+#include <cuda.h>
 #endif
 
 namespace pbrt {
@@ -632,7 +634,7 @@ class SpectrumImageTexture : public ImageTextureBase {
 class GPUSpectrumImageTexture {
   public:
     GPUSpectrumImageTexture(std::string filename, TextureMapping2D mapping,
-                            hipTextureObject_t texObj, Float scale, bool invert,
+                            cudaTextureObject_t texObj, Float scale, bool invert,
                             bool isSingleChannel, const RGBColorSpace *colorSpace,
                             SpectrumType spectrumType)
         : mapping(mapping),
@@ -688,7 +690,7 @@ class GPUSpectrumImageTexture {
 
     TextureMapping2D mapping;
     std::string filename;
-    hipTextureObject_t texObj;
+    cudaTextureObject_t texObj;
     Float scale;
     bool invert, isSingleChannel;
     const RGBColorSpace *colorSpace;
@@ -698,7 +700,7 @@ class GPUSpectrumImageTexture {
 class GPUFloatImageTexture {
   public:
     GPUFloatImageTexture(std::string filename, TextureMapping2D mapping,
-                         hipTextureObject_t texObj, Float scale, bool invert)
+                         cudaTextureObject_t texObj, Float scale, bool invert)
         : mapping(mapping),
           filename(filename),
           texObj(texObj),
@@ -731,7 +733,7 @@ class GPUFloatImageTexture {
 
     TextureMapping2D mapping;
     std::string filename;
-    hipTextureObject_t texObj;
+    cudaTextureObject_t texObj;
     Float scale;
     bool invert;
 };
