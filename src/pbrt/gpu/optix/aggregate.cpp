@@ -73,9 +73,7 @@ struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) MissRecord {
 
 struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) OptiXAggregate::HitgroupRecord {
     HitgroupRecord() {}
-    HitgroupRecord(const HitgroupRecord &r) {
-        memcpy(this, &r, sizeof(HitgroupRecord));
-    }
+    HitgroupRecord(const HitgroupRecord &r) { memcpy(this, &r, sizeof(HitgroupRecord)); }
     HitgroupRecord &operator=(const HitgroupRecord &r) {
         if (this != &r)
             memcpy(this, &r, sizeof(HitgroupRecord));
@@ -269,7 +267,8 @@ std::map<int, TriQuadMesh> OptiXAggregate::PreparePLYMeshes(
         if (!plyMesh.triIndices.empty() || !plyMesh.quadIndices.empty()) {
             plyMesh.ConvertToOnlyTriangles();
 
-            Float edgeLength = shape.parameters.GetOneFloat("edgelength", 1.f);
+            Float edgeLength =
+                shape.parameters.GetOneFloat("edgelength", 1.f);
             edgeLength *= Options->displacementEdgeScale;
 
             std::string displacementTexName = shape.parameters.GetTexture("displacement");
@@ -461,12 +460,12 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
             float *pGPU;
             std::vector<float> p32(3 * mesh->nVertices);
             for (int i = 0; i < mesh->nVertices; i++) {
-                p32[3 * i] = mesh->p[i].x;
-                p32[3 * i + 1] = mesh->p[i].y;
-                p32[3 * i + 2] = mesh->p[i].z;
+                p32[3*i] = mesh->p[i].x;
+                p32[3*i+1] = mesh->p[i].y;
+                p32[3*i+2] = mesh->p[i].z;
             }
             CUDA_CHECK(cudaMalloc(&pGPU, mesh->nVertices * 3 * sizeof(float)));
-            CUDA_CHECK(cudaMemcpy(pGPU, p32.data(), mesh->nVertices * 3 * sizeof(float),
+            CUDA_CHECK(cudaMemcpy(pGPU, p32.data(), mesh->nVertices * 3 *  sizeof(float),
                                   cudaMemcpyHostToDevice));
 #else
             input.triangleArray.vertexStrideInBytes = sizeof(Point3f);
@@ -483,8 +482,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
             input.triangleArray.numIndexTriplets = mesh->nTriangles;
             int *indicesGPU;
             CUDA_CHECK(cudaMalloc(&indicesGPU, mesh->nTriangles * 3 * sizeof(int)));
-            CUDA_CHECK(cudaMemcpy(indicesGPU, mesh->vertexIndices,
-                                  mesh->nTriangles * 3 * sizeof(int),
+            CUDA_CHECK(cudaMemcpy(indicesGPU, mesh->vertexIndices, mesh->nTriangles * 3 * sizeof(int),
                                   cudaMemcpyHostToDevice));
             input.triangleArray.indexBuffer = CUdeviceptr(indicesGPU);
 
@@ -1098,10 +1096,13 @@ OptixModule OptiXAggregate::createOptiXModule(OptixDeviceContext optixContext,
 #define OPTIX_MODULE_CREATE_FN optixModuleCreateFromPTX
 #endif
 
-    OPTIX_CHECK_WITH_LOG(OPTIX_MODULE_CREATE_FN(optixContext, &moduleCompileOptions,
-                                                &pipelineCompileOptions, ptx, strlen(ptx),
-                                                log, &logSize, &optixModule),
-                         log);
+    OPTIX_CHECK_WITH_LOG(
+        OPTIX_MODULE_CREATE_FN(
+            optixContext, &moduleCompileOptions, &pipelineCompileOptions,
+            ptx, strlen(ptx), log, &logSize, &optixModule
+        ),
+        log
+    );
 
     LOG_VERBOSE("%s", log);
 
@@ -1297,7 +1298,7 @@ OptiXAggregate::OptiXAggregate(
 #else
     pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
 #endif
-#endif  // OPTIX_VERSION
+#endif // OPTIX_VERSION
 
     OPTIX_CHECK_WITH_LOG(
         optixPipelineCreate(optixContext, &pipelineCompileOptions, &pipelineLinkOptions,
