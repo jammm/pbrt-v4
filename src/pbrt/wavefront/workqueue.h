@@ -33,7 +33,7 @@
 #include <cuda/atomic>
 #endif
 
-#elif defined(__HIP_PLATFORM_AMD__)
+#elif defined(__HIPCC__)
 #define PBRT_USE_LEGACY_CUDA_ATOMICS
 
 #endif  // __CUDACC__

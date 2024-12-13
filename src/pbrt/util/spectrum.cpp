@@ -2595,9 +2595,9 @@ void Init(Allocator alloc) {
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     if (Options->useGPU) {
-        CUDA_CHECK(hipMemcpyToSymbol((const void *)&xGPU, (const void *)&x, sizeof(x)));
-        CUDA_CHECK(hipMemcpyToSymbol((const void *)&yGPU, (const void *)&y, sizeof(y)));
-        CUDA_CHECK(hipMemcpyToSymbol((const void *)&zGPU, (const void *)&z, sizeof(z)));
+        CUDA_CHECK(cudaMemcpyToSymbol(xGPU, &x, sizeof(x)));
+        CUDA_CHECK(cudaMemcpyToSymbol(yGPU, &y, sizeof(y)));
+        CUDA_CHECK(cudaMemcpyToSymbol(zGPU, &z, sizeof(z)));
     }
 #endif
 

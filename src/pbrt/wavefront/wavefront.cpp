@@ -66,11 +66,11 @@ void RenderWavefront(BasicScene &scene) {
     integrator->camera.InitMetadata(&metadata);
     metadata.renderTimeSeconds = seconds;
     metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
-#ifdef __HIP_PLATFORM_AMD__
+#ifdef __HIPCC__
     if (Options->useGPU) DisableThreadPool();
 #endif
     integrator->film.WriteImage(metadata);
-#ifdef __HIP_PLATFORM_AMD__
+#ifdef __HIPCC__
     if (Options->useGPU) ReenableThreadPool();
 #endif
 }

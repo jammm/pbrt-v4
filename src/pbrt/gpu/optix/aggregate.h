@@ -86,7 +86,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         ThreadLocal<Allocator> &threadAllocators,
-        ThreadLocal<hipStream_t> &threadCUDAStreams);
+        ThreadLocal<cudaStream_t> &threadCUDAStreams);
 
     static BilinearPatchMesh *diceCurveToBLP(const ShapeSceneEntity &shape, int nDiceU,
                                              int nDiceV, Allocator alloc);
@@ -101,7 +101,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         ThreadLocal<Allocator> &threadAllocators,
-        ThreadLocal<hipStream_t> &threadCUDAStreams);
+        ThreadLocal<cudaStream_t> &threadCUDAStreams);
 
     static BVH buildBVHForQuadrics(
         const std::vector<ShapeSceneEntity> &shapes, OptixDeviceContext optixContext,
@@ -113,7 +113,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         ThreadLocal<Allocator> &threadAllocators,
-        ThreadLocal<hipStream_t> &threadCUDAStreams);
+        ThreadLocal<cudaStream_t> &threadCUDAStreams);
 
     int addHGRecords(const BVH &bvh);
 
@@ -128,20 +128,20 @@ class OptiXAggregate : public WavefrontAggregate {
 
     static OptixTraversableHandle buildOptixBVH(
         OptixDeviceContext optixContext, const std::vector<OptixBuildInput> &buildInputs,
-        ThreadLocal<hipStream_t> &threadCUDAStreams);
+        ThreadLocal<cudaStream_t> &threadCUDAStreams);
 
     CUDATrackedMemoryResource *memoryResource;
     std::mutex boundsMutex;
     Bounds3f bounds;
-    hipStream_t cudaStream;
+    CUstream cudaStream;
     OptixDeviceContext optixContext;
     OptixModule optixModule;
     OptixPipeline optixPipeline;
 
     struct ParamBufferState {
         bool used = false;
-        hipEvent_t finishedEvent;
-        hipDeviceptr_t ptr = 0;
+        cudaEvent_t finishedEvent;
+        CUdeviceptr ptr = 0;
         void *hostPtr = nullptr;
     };
     mutable std::vector<ParamBufferState> paramsPool;

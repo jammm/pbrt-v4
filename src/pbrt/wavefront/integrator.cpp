@@ -9,7 +9,7 @@
 #include <pbrt/film.h>
 #include <pbrt/filters.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
-#if defined(__HIP_PLATFORM_AMD__)
+#if defined(__HIPCC__)
 #include <pbrt/gpu/hiprt/aggregate.h>
 #else
 #include <pbrt/gpu/optix/aggregate.h>
@@ -171,7 +171,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
         CUDATrackedMemoryResource *mr =
             dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
         CHECK(mr);
-#ifdef __HIP_PLATFORM_AMD__
+#ifdef __HIPCC__
         aggregate = new HiprtAggregate(scene, mr, textures, shapeIndexToAreaLights, media,
                                        namedMaterials, materials, maxQueueSize);
 #else
@@ -614,10 +614,10 @@ std::string WavefrontPathIntegrator::Stats::Print() const {
 #ifdef PBRT_BUILD_GPU_RENDERER
 void WavefrontPathIntegrator::PrefetchGPUAllocations() {
     int deviceIndex;
-    CUDA_CHECK(hipGetDevice(&deviceIndex));
+    CUDA_CHECK(cudaGetDevice(&deviceIndex));
     int hasConcurrentManagedAccess;
-    CUDA_CHECK(hipDeviceGetAttribute(&hasConcurrentManagedAccess,
-                                      hipDeviceAttributeConcurrentManagedAccess, deviceIndex));
+    CUDA_CHECK(cudaDeviceGetAttribute(&hasConcurrentManagedAccess,
+                                      cudaDevAttrConcurrentManagedAccess, deviceIndex));
 
     // Copy all of the scene data structures over to GPU memory.  This
     // ensures that there isn't a big performance hitch for the first batch
@@ -628,9 +628,9 @@ void WavefrontPathIntegrator::PrefetchGPUAllocations() {
         // performance. (This makes it possible to use the values of things
         // like WavefrontPathIntegrator::haveSubsurface to conditionally launch
         // kernels according to what's in the scene...)
-        CUDA_CHECK(hipMemAdvise(this, sizeof(*this), hipMemAdviseSetReadMostly,
+        CUDA_CHECK(cudaMemAdvise(this, sizeof(*this), cudaMemAdviseSetReadMostly,
                                  /* ignored argument */ 0));
-        CUDA_CHECK(hipMemAdvise(this, sizeof(*this), hipMemAdviseSetPreferredLocation,
+        CUDA_CHECK(cudaMemAdvise(this, sizeof(*this), cudaMemAdviseSetPreferredLocation,
                                  deviceIndex));
 
         // Copy all of the scene data structures over to GPU memory.  This
@@ -656,8 +656,8 @@ void WavefrontPathIntegrator::StartDisplayThread() {
     if (Options->useGPU) {
         // Allocate staging memory on the GPU to store the current WIP
         // image.
-        CUDA_CHECK(hipMalloc(&displayRGB, resolution.x * resolution.y * sizeof(RGB)));
-        CUDA_CHECK(hipMemset(displayRGB, 0, resolution.x * resolution.y * sizeof(RGB)));
+        CUDA_CHECK(cudaMalloc(&displayRGB, resolution.x * resolution.y * sizeof(RGB)));
+        CUDA_CHECK(cudaMemset(displayRGB, 0, resolution.x * resolution.y * sizeof(RGB)));
 
         // Host-side memory for the WIP Image.  We'll just let this leak so
         // that the lambda passed to DisplayDynamic below doesn't access
@@ -675,26 +675,26 @@ void WavefrontPathIntegrator::StartDisplayThread() {
             // Copy back to the CPU using a separate stream so that we can
             // periodically but asynchronously pick up the latest results
             // from the GPU.
-            hipStream_t memcpyStream;
-            CUDA_CHECK(hipStreamCreate(&memcpyStream));
+            cudaStream_t memcpyStream;
+            CUDA_CHECK(cudaStreamCreate(&memcpyStream));
             GPUNameStream(memcpyStream, "DISPLAY_SERVER_COPY_STREAM");
 
             // Copy back to the host from the GPU buffer, without any
             // synthronization.
             while (!*exitCopyThread) {
-                CUDA_CHECK(hipMemcpyAsync(displayRGBHost, displayRGB,
+                CUDA_CHECK(cudaMemcpyAsync(displayRGBHost, displayRGB,
                                            resolution.x * resolution.y * sizeof(RGB),
-                                           hipMemcpyDeviceToHost, memcpyStream));
+                                           cudaMemcpyDeviceToHost, memcpyStream));
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-                CUDA_CHECK(hipStreamSynchronize(memcpyStream));
+                CUDA_CHECK(cudaStreamSynchronize(memcpyStream));
             }
 
             // Copy one more time to get the final image before exiting.
-            CUDA_CHECK(hipMemcpy(displayRGBHost, displayRGB,
+            CUDA_CHECK(cudaMemcpy(displayRGBHost, displayRGB,
                                   resolution.x * resolution.y * sizeof(RGB),
-                                  hipMemcpyDeviceToHost));
-            CUDA_CHECK(hipDeviceSynchronize());
+                                  cudaMemcpyDeviceToHost));
+            CUDA_CHECK(cudaDeviceSynchronize());
         });
 
         // Now on the CPU side, give the display system a lambda that

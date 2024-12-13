@@ -23,6 +23,7 @@
 #define cudaFuncCachePreferL1 hipFuncCachePreferL1
 #define cudaGetDeviceProperties hipGetDeviceProperties
 #define cudaDevAttrKernelExecTimeout hipDeviceAttributeKernelExecTimeout
+#define cudaDevAttrConcurrentManagedAccess hipDeviceAttributeConcurrentManagedAccess
 #define cudaDriverGetVersion hipDriverGetVersion
 #define cudaRuntimeGetVersion hipRuntimeGetVersion
 
@@ -50,6 +51,9 @@
 #define cudaMemcpyFromSymbol hipMemcpyFromSymbol
 #define cudaMemPrefetchAsync hipMemPrefetchAsync
 #define cudaMemset hipMemset
+#define cudaMemAdvise hipMemAdvise
+#define cudaMemAdviseSetReadMostly hipMemAdviseSetReadMostly
+#define cudaMemAdviseSetPreferredLocation hipMemAdviseSetPreferredLocation
 
 #define cudaArray_t hipArray_t
 #define cudaMallocArray hipMallocArray
@@ -90,6 +94,8 @@
 
 #define CUstream hipStream_t
 #define cudaStream_t hipStream_t
+#define cudaStreamCreate hipStreamCreate
+#define cudaStreamSynchronize hipStreamSynchronize
 #define cudaDeviceSynchronize hipDeviceSynchronize
 
 #define cudaOccupancyMaxPotentialBlockSize hipOccupancyMaxPotentialBlockSize

@@ -744,7 +744,7 @@ class TaggedPointer {
     PBRT_CPU_GPU TaggedPointer(T *ptr) {
         uint64_t iptr = reinterpret_cast<uint64_t>(ptr);
         constexpr unsigned int type = TypeIndex<T>();
-#if defined(PBRT_IS_WINDOWS) && defined(__HIP_PLATFORM_AMD__)
+#if defined(PBRT_IS_WINDOWS) && defined(__HIPCC__)
         uint64_t aptr = (iptr & tagMask) >> 5ull;
         bits = (iptr & ptrMask) | aptr | ((uint64_t)type << (tagShift + 2ull));
 #else
@@ -775,7 +775,7 @@ class TaggedPointer {
 
     PBRT_CPU_GPU
     unsigned int Tag() const { 
-#if defined(PBRT_IS_WINDOWS) && defined(__HIP_PLATFORM_AMD__)
+#if defined(PBRT_IS_WINDOWS) && defined(__HIPCC__)
         return ((bits & tagMask) >> (tagShift + 2ull)); 
 #else
         return ((bits & tagMask) >> tagShift);
@@ -837,7 +837,7 @@ class TaggedPointer {
 
     PBRT_CPU_GPU
     void *ptr() {
-#if defined(PBRT_IS_WINDOWS) && defined(__HIP_PLATFORM_AMD__)
+#if defined(PBRT_IS_WINDOWS) && defined(__HIPCC__)
         unsigned int aptr = (bits >> tagShift) & 3;
         uint64_t iptr = bits & ptrMask;
         // lld crashes on Windows
@@ -856,7 +856,7 @@ class TaggedPointer {
 
     PBRT_CPU_GPU
     const void *ptr() const {
-#if defined(PBRT_IS_WINDOWS) && defined(__HIP_PLATFORM_AMD__)
+#if defined(PBRT_IS_WINDOWS) && defined(__HIPCC__)
         unsigned int aptr = (bits >> tagShift) & 3;
         uint64_t iptr = bits & ptrMask;
         // lld crashes on Windows
@@ -905,7 +905,7 @@ class TaggedPointer {
     static_assert(sizeof(uintptr_t) <= sizeof(uint64_t),
                   "Expected pointer size to be <= 64 bits");
     // TaggedPointer Private Members
-#if defined(PBRT_IS_WINDOWS) && defined(__HIP_PLATFORM_AMD__)
+#if defined(PBRT_IS_WINDOWS) && defined(__HIPCC__)
     static constexpr int tagShift = 55;
 #else
     static constexpr int tagShift = 57;

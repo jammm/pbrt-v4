@@ -104,7 +104,7 @@ TEST(Point2, InvertBilinear) {
     }
 }
 
-#if !defined(__HIP_PLATFORM_AMD__)
+#if !defined(__HIPCC__)
 TEST(Vector, AngleBetween) {
     EXPECT_EQ(0, AngleBetween(Vector3f(1, 0, 0), Vector3f(1, 0, 0)));
 
