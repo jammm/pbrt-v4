@@ -40,7 +40,12 @@
 #include <map>
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-#include <hip/hip_runtime.h>
+#if defined(__HIPCC__)
+#include <pbrt/util/hip_aliases.h>
+#else
+#include <cuda.h>
+#include <cuda_runtime.h>
+#endif
 #endif  // PBRT_BUILD_GPU_RENDERER
 
 namespace pbrt {
