@@ -7,9 +7,9 @@
 #include <pbrt/filters.h>
 #include <pbrt/options.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
-#ifdef __HIP_PLATFORM_NVIDIA__
+#ifdef __NVCC__
 #include <pbrt/gpu/optix/denoiser.h>
-#endif  // __HIP_PLATFORM_NVIDIA__
+#endif  // __NVCC__
 #include <pbrt/gpu/util.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/util/args.h>
@@ -2220,7 +2220,7 @@ int makeequiarea(std::vector<std::string> args) {
     return 0;
 }
 
-#ifdef __HIP_PLATFORM_NVIDIA__
+#ifdef __NVCC__
 int denoise_optix(std::vector<std::string> args) {
     std::string inFilename, outFilename;
 
@@ -2246,7 +2246,7 @@ int denoise_optix(std::vector<std::string> args) {
     ImageAndMetadata im = Image::Read(inFilename);
     Image &image = im.image;
 
-    CUDA_CHECK(hipFree(nullptr));
+    CUDA_CHECK(cudaFree(nullptr));
 
     int nLayers = 3;
     bool oldNormalNaming = false;
@@ -2283,7 +2283,7 @@ int denoise_optix(std::vector<std::string> args) {
 
     auto copyChannelsToGPU = [&](std::array<std::string, 3> ch, bool flipZ = false) {
         void *bufGPU;
-        CUDA_CHECK(hipMalloc(&bufGPU, imageBytes));
+        CUDA_CHECK(cudaMalloc(&bufGPU, imageBytes));
         std::vector<float> hostStaging(imageBytes / sizeof(float));
 
         ImageChannelDesc desc = image.GetChannelDesc(ch);
@@ -2298,7 +2298,7 @@ int denoise_optix(std::vector<std::string> args) {
                     hostStaging[offset++] = v[c];
             }
         CUDA_CHECK(
-            hipMemcpy(bufGPU, hostStaging.data(), imageBytes, hipMemcpyHostToDevice));
+            cudaMemcpy(bufGPU, hostStaging.data(), imageBytes, cudaMemcpyHostToDevice));
         return bufGPU;
     };
     RGB *rgbGPU = (RGB *)copyChannelsToGPU({"R", "G", "B"});
@@ -2314,15 +2314,15 @@ int denoise_optix(std::vector<std::string> args) {
     }
 
     RGB *rgbResultGPU;
-    CUDA_CHECK(hipMalloc(&rgbResultGPU, imageBytes));
+    CUDA_CHECK(cudaMalloc(&rgbResultGPU, imageBytes));
 
     denoiser.Denoise(rgbGPU, normalGPU, albedoGPU, rgbResultGPU);
 
-    CUDA_CHECK(hipDeviceSynchronize());
+    CUDA_CHECK(cudaDeviceSynchronize());
 
     Image result(PixelFormat::Float, image.Resolution(), {"R", "G", "B"});
-    CUDA_CHECK(hipMemcpy(result.RawPointer({0, 0}), (const void *)rgbResultGPU,
-                          imageBytes, hipMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(result.RawPointer({0, 0}), (const void *)rgbResultGPU,
+                          imageBytes, cudaMemcpyDeviceToHost));
 
     ImageMetadata outMetadata;
     outMetadata.cameraFromWorld = im.metadata.cameraFromWorld;
@@ -2362,10 +2362,10 @@ int main(int argc, char *argv[]) {
         return convert(args);
     else if (cmd == "diff")
         return diff(args);
-#ifdef __HIP_PLATFORM_NVIDIA__
+#ifdef __NVCC__
     else if (cmd == "denoise-optix")
         return denoise_optix(args);
-#endif  // __HIP_PLATFORM_NVIDIA__
+#endif  // __NVCC__
     else if (cmd == "error")
         return error(args);
     else if (cmd == "falsecolor")

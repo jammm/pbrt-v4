@@ -17,7 +17,7 @@
 #include <pbrt/util/vecmath.h>
 
 #if defined(__HIPCC__)
-#include <pbrt/gpu/hip_aliases.h>
+#include <pbrt/util/hip_aliases.h>
 #else
 #include <cuda.h>
 #include <cuda_runtime_api.h>

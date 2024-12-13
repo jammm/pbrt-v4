@@ -9,11 +9,16 @@
 
 #define cudaMalloc hipMalloc
 #define cudaMallocHost hipHostMalloc
+#define cudaFree hipFree
+
+#define cudaMemcpy hipMemcpy
 #define cudaMemcpyAsync hipMemcpyAsync
 #define cudaMemcpyHostToDevice hipMemcpyHostToDevice
 
 #define cudaEventCreate hipEventCreate
 #define cudaEventRecord hipEventRecord
 #define cudaEventSynchronize hipEventSynchronize
+
+#define cudaDeviceSynchronize hipDeviceSynchronize
 
 #endif  // PBRT_GPU_HIP_ALIASES_H
