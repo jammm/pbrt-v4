@@ -14,10 +14,6 @@
 #include <string>
 #include <vector>
 
-#ifdef __HIPCC__
-#include <hip/hip_runtime.h>
-#endif
-
 namespace pbrt {
 
 void PrintStackTrace();

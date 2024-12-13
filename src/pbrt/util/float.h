@@ -16,9 +16,13 @@
 #include <string>
 
 #if defined(PBRT_BUILD_GPU_RENDERER) && defined(PBRT_IS_GPU_CODE)
+#if defined(__HIPCC__)
 #include <hip/hip_runtime.h>
 #include <hip/math_functions.h>
 #include <hip/hip_fp16.h>
+#else
+#include <cuda_fp16.h>
+#endif
 #endif
 
 namespace pbrt {
