@@ -21,7 +21,8 @@
 #include <string>
 #include <vector>
 
-#include <hip/hip_runtime.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <optix.h>
 
 namespace pbrt {
