@@ -175,7 +175,7 @@ std::string SpectrumBilerpTexture::ToString() const {
 }
 
 // CheckerboardTexture Function Definitions
-Float Checkerboard(TextureEvalContext ctx, TextureMapping2D map2D,
+PBRT_CPU_GPU Float Checkerboard(TextureEvalContext ctx, TextureMapping2D map2D,
                    TextureMapping3D map3D) {
     // Define 1D checkerboard filtered integral functions
     auto d = [](Float x) {
@@ -280,7 +280,7 @@ std::string SpectrumCheckerboardTexture::ToString() const {
 }
 
 // InsidePolkaDot Function Definition
-bool InsidePolkaDot(Point2f st) {
+PBRT_CPU_GPU bool InsidePolkaDot(Point2f st) {
     // Compute cell indices (_sCell_,_tCell_ for dots
     int sCell = pstd::floor(st[0] + .5f), tCell = pstd::floor(st[1] + .5f);
 
@@ -351,7 +351,7 @@ std::string FBmTexture::ToString() const {
 }
 
 // SpectrumImageTexture Method Definitions
-SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
+PBRT_CPU_GPU SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
                                                SampledWavelengths lambda) const {
 #ifdef PBRT_IS_GPU_CODE
     CHECK(!"Should not be called in GPU code");
@@ -472,7 +472,7 @@ SpectrumImageTexture *SpectrumImageTexture::Create(
 }
 
 // MarbleTexture Method Definitions
-SampledSpectrum MarbleTexture::Evaluate(TextureEvalContext ctx,
+PBRT_CPU_GPU SampledSpectrum MarbleTexture::Evaluate(TextureEvalContext ctx,
                                         SampledWavelengths lambda) const {
     TexCoord3D c = mapping.Map(ctx);
     c.p *= scale;
@@ -577,7 +577,6 @@ SpectrumDirectionMixTexture *SpectrumDirectionMixTexture::Create(
         parameters.GetSpectrumTexture("tex2", one, spectrumType, alloc), dir);
 }
 
-static std::mutex ptexMutex;
 static Ptex::PtexCache *cache;
 
 STAT_COUNTER("Texture/Ptex lookups", nLookups);
@@ -596,7 +595,8 @@ struct : public PtexErrorHandler {
 PtexTextureBase::PtexTextureBase(const std::string &filename, ColorEncoding encoding,
                                  Float scale)
     : filename(filename), encoding(encoding), scale(scale) {
-    ptexMutex.lock();
+    std::mutex mutex;
+    mutex.lock();
     if (!cache) {
         int maxFiles = 100;
         size_t maxMem = 1ull << 32;  // 4GB
@@ -606,7 +606,7 @@ PtexTextureBase::PtexTextureBase(const std::string &filename, ColorEncoding enco
                                         &errorHandler);
         // TODO? cache->setSearchPath(...);
     }
-    ptexMutex.unlock();
+    mutex.unlock();
 
     // Issue an error if the texture doesn't exist or has an unsupported
     // number of channels.
@@ -690,7 +690,7 @@ std::string SpectrumPtexTexture::ToString() const {
     return StringPrintf("[ SpectrumPtexTexture %s ]", BaseToString());
 }
 
-Float FloatPtexTexture::Evaluate(TextureEvalContext ctx) const {
+PBRT_CPU_GPU Float FloatPtexTexture::Evaluate(TextureEvalContext ctx) const {
 #ifdef PBRT_IS_GPU_CODE
     LOG_FATAL("Ptex not supported with GPU renderer");
     return 0;
@@ -704,7 +704,7 @@ Float FloatPtexTexture::Evaluate(TextureEvalContext ctx) const {
 #endif
 }
 
-SampledSpectrum SpectrumPtexTexture::Evaluate(TextureEvalContext ctx,
+PBRT_CPU_GPU SampledSpectrum SpectrumPtexTexture::Evaluate(TextureEvalContext ctx,
                                               SampledWavelengths lambda) const {
 #ifdef PBRT_IS_GPU_CODE
     LOG_FATAL("Ptex not supported with GPU renderer");
@@ -1670,11 +1670,11 @@ SpectrumTexture SpectrumTexture::Create(const std::string &name,
 }
 
 // UniversalTextureEvaluator Method Definitions
-Float UniversalTextureEvaluator::operator()(FloatTexture tex, TextureEvalContext ctx) {
+PBRT_CPU_GPU Float UniversalTextureEvaluator::operator()(FloatTexture tex, TextureEvalContext ctx) {
     return tex.Evaluate(ctx);
 }
 
-SampledSpectrum UniversalTextureEvaluator::operator()(SpectrumTexture tex,
+PBRT_CPU_GPU SampledSpectrum UniversalTextureEvaluator::operator()(SpectrumTexture tex,
                                                       TextureEvalContext ctx,
                                                       SampledWavelengths lambda) {
     return tex.Evaluate(ctx, lambda);

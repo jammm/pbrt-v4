@@ -327,7 +327,7 @@ std::string ToString(LogLevel level) {
     }
 }
 
-void Log(LogLevel level, const char *file, int line, const char *s) {
+PBRT_CPU_GPU void Log(LogLevel level, const char *file, int line, const char *s) {
 #ifdef PBRT_IS_GPU_CODE
     auto strlen = [](const char *ptr) {
         int len = 0;
@@ -398,7 +398,7 @@ void Log(LogLevel level, const char *file, int line, const char *s) {
 #endif
 #endif
 
-void LogFatal(LogLevel level, const char *file, int line, const char *s) {
+PBRT_CPU_GPU void LogFatal(LogLevel level, const char *file, int line, const char *s) {
 #ifdef PBRT_IS_GPU_CODE
     Log(LogLevel::Fatal, file, line, s);
     __threadfence();
