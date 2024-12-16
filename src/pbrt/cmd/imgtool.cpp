@@ -9,7 +9,7 @@
 #ifdef PBRT_BUILD_GPU_RENDERER
 #ifdef __NVCC__
 #include <pbrt/gpu/optix/denoiser.h>
-#endif  // __NVCC__
+#endif // __NVCC__
 #include <pbrt/gpu/util.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/util/args.h>
