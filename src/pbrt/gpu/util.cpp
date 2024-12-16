@@ -78,7 +78,7 @@ void GPUInit() {
 
 // there was a bug in HIP stating unsupported while actually supported
 // not sure whether has been fixed
-#ifdef __CUDACC__ 
+#ifdef __NVCC__ 
     int hasUnifiedAddressing;
     CUDA_CHECK(cudaDeviceGetAttribute(&hasUnifiedAddressing, cudaDevAttrUnifiedAddressing,
                                       device));
@@ -92,7 +92,7 @@ void GPUInit() {
     CUDA_CHECK(cudaDeviceGetLimit(&stackSize, cudaLimitStackSize));
     LOG_VERBOSE("Reset stack size to %d", stackSize);
 
-#ifdef __CUDACC__
+#ifdef __NVCC__
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 32 * 1024 * 1024));
 
     CUDA_CHECK(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));

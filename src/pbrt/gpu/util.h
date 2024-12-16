@@ -42,7 +42,7 @@
         LOG_FATAL("CUDA error: %s", cudaGetErrorString(error)); \
     } else /* eat semicolon */
 
-#ifdef __CUDACC__  // only used in denoiser.cpp
+#ifdef __NVCC__  // only used in denoiser.cpp
 #define CU_CHECK(EXPR)                                              \
     do {                                                            \
         CUresult result = EXPR;                                     \
@@ -71,11 +71,11 @@ inline int GetBlockSize(const char *description, F kernel) {
 
     int minGridSize, blockSize;
 // this API is not reliable in HIP sometimes returning even negative values
-#ifdef __CUDACC__  
+#ifdef __HIPCC__  
+    blockSize = 64;
+#else
     CUDA_CHECK(
         cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, kernel, 0, 0));
-#else
-        blockSize = 64;
 #endif
     kernelBlockSizes[index] = blockSize;
     LOG_VERBOSE("[%s]: block size %d", description, blockSize);
