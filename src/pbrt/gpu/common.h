@@ -12,7 +12,7 @@
 #include <pbrt/wavefront/workitems.h>
 #include <pbrt/wavefront/workqueue.h>
 
-#if defined(__HIP_PLATFORM_AMD__)
+#if defined(__HIPCC__)
 #include <hiprt/hiprt.h>
 #include <hiprt/hiprt_vec.h>
 #else
@@ -72,7 +72,7 @@ struct alignas(HitgroupAlignment) HitgroupRecord {
 #endif
 
 struct RayIntersectParameters {
-#if defined(__HIP_PLATFORM_AMD__)
+#if defined(__HIPCC__)
     hiprtScene traversable;
 #else
     OptixTraversableHandle traversable;
@@ -94,7 +94,7 @@ struct RayIntersectParameters {
     // Subsurface scattering...
     SubsurfaceScatterQueue *subsurfaceScatterQueue;
 
-#if defined(__HIP_PLATFORM_AMD__)
+#if defined(__HIPCC__)
     // Stack buffers
     hiprtGlobalStackBuffer globalStackBuffer;
     hiprtGlobalStackBuffer globalInstanceStackBuffer;
