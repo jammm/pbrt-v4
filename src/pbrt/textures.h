@@ -624,7 +624,7 @@ class SpectrumImageTexture : public ImageTextureBase {
     SpectrumType spectrumType;
 };
 
-#if defined(PBRT_BUILD_GPU_RENDERER) && defined(__NVCC__)
+#if defined(PBRT_BUILD_GPU_RENDERER) && (defined(__NVCC__) || defined(__HIPCC__))
 class GPUSpectrumImageTexture {
   public:
     GPUSpectrumImageTexture(std::string filename, TextureMapping2D mapping,
@@ -732,7 +732,7 @@ class GPUFloatImageTexture {
     bool invert;
 };
 
-#else  // PBRT_BUILD_GPU_RENDERER && __NVCC__
+#else  // PBRT_BUILD_GPU_RENDERER && (__NVCC__ ||  __HIPCC__)
 
 class GPUSpectrumImageTexture {
   public:
@@ -769,7 +769,7 @@ class GPUFloatImageTexture {
     std::string ToString() const { return "GPUFloatImageTexture"; }
 };
 
-#endif  // PBRT_BUILD_GPU_RENDERER && __NVCC__
+#endif  // PBRT_BUILD_GPU_RENDERER && (__NVCC__ ||  __HIPCC__)
 
 // MarbleTexture Definition
 class MarbleTexture {

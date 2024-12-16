@@ -66,10 +66,10 @@ class RGBColorSpace {
 };
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-extern PBRT_CONST RGBColorSpace *RGBColorSpace_sRGB;
-extern PBRT_CONST RGBColorSpace *RGBColorSpace_DCI_P3;
-extern PBRT_CONST RGBColorSpace *RGBColorSpace_Rec2020;
-extern PBRT_CONST RGBColorSpace *RGBColorSpace_ACES2065_1;
+extern PBRT_GPU __constant__ RGBColorSpace *RGBColorSpace_sRGB;
+extern PBRT_GPU __constant__ RGBColorSpace *RGBColorSpace_DCI_P3;
+extern PBRT_GPU __constant__ RGBColorSpace *RGBColorSpace_Rec2020;
+extern PBRT_GPU __constant__ RGBColorSpace *RGBColorSpace_ACES2065_1;
 #endif
 
 SquareMatrix<3> ConvertRGBColorSpace(const RGBColorSpace &from, const RGBColorSpace &to);

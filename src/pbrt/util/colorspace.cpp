@@ -12,10 +12,10 @@
 namespace pbrt {
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-PBRT_CONST RGBColorSpace *RGBColorSpace_sRGB;
-PBRT_CONST RGBColorSpace *RGBColorSpace_DCI_P3;
-PBRT_CONST RGBColorSpace *RGBColorSpace_Rec2020;
-PBRT_CONST RGBColorSpace *RGBColorSpace_ACES2065_1;
+PBRT_GPU __constant__ RGBColorSpace *RGBColorSpace_sRGB;
+PBRT_GPU __constant__ RGBColorSpace *RGBColorSpace_DCI_P3;
+PBRT_GPU __constant__ RGBColorSpace *RGBColorSpace_Rec2020;
+PBRT_GPU __constant__ RGBColorSpace *RGBColorSpace_ACES2065_1;
 #endif
 
 // Color Space Constants
