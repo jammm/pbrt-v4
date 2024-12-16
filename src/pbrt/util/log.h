@@ -63,6 +63,7 @@ PBRT_CPU_GPU inline void Log(LogLevel level, const char *file, int line, const c
 
 extern __constant__ LogLevel LOGGING_LogLevelGPU;
 
+// printing may cause hang in the device code
 #ifdef __HIP_DEVICE_COMPILE__
 
 #define LOG_VERBOSE(...) \
