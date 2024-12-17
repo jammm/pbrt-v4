@@ -1192,11 +1192,11 @@ HiprtAggregate::GeometryContainer HiprtAggregate::buildBVHForBLPs(
                 patchBounds =
                     Union(patchBounds, mesh->p[mesh->vertexIndices[4 * patchIndex + i]]);
             hiprtFloat4 aabbMin =
-                make_hiprtFloat4(float(patchBounds.pMin.x), float(patchBounds.pMin.y),
-                                 float(patchBounds.pMin.z), 0.0f);
+                hiprtFloat4{float(patchBounds.pMin.x), float(patchBounds.pMin.y),
+                            float(patchBounds.pMin.z), 0.0f};
             hiprtFloat4 aabbMax =
-                make_hiprtFloat4(float(patchBounds.pMax.x), float(patchBounds.pMax.y),
-                                 float(patchBounds.pMax.z), 0.0f);
+                hiprtFloat4{float(patchBounds.pMax.x), float(patchBounds.pMax.y),
+                            float(patchBounds.pMax.z), 0.0f};
             aabbBuffer[2 * aabbIndex + 0] = aabbMin;
             aabbBuffer[2 * aabbIndex + 1] = aabbMax;
             ++aabbIndex;
@@ -1291,11 +1291,11 @@ HiprtAggregate::GeometryContainer HiprtAggregate::buildBVHForQuadrics(
 
         Bounds3f shapeBounds = shape.Bounds();
         hiprtFloat4 aabbMin =
-            make_hiprtFloat4(float(shapeBounds.pMin.x), float(shapeBounds.pMin.y),
-                             float(shapeBounds.pMin.z), 0.0f);
+            hiprtFloat4{float(shapeBounds.pMin.x), float(shapeBounds.pMin.y),
+                        float(shapeBounds.pMin.z), 0.0f};
         hiprtFloat4 aabbMax =
-            make_hiprtFloat4(float(shapeBounds.pMax.x), float(shapeBounds.pMax.y),
-                             float(shapeBounds.pMax.z), 0.0f);
+            hiprtFloat4{float(shapeBounds.pMax.x), float(shapeBounds.pMax.y),
+                        float(shapeBounds.pMax.z), 0.0f};
         aabbBuffer[2 * quadricIndex + 0] = aabbMin;
         aabbBuffer[2 * quadricIndex + 1] = aabbMax;
 
