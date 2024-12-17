@@ -3,6 +3,7 @@
 
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
+#include <hip/hip_gl_interop.h>
 
 #define cudaError_t hipError_t
 #define cudaSuccess hipSuccess
@@ -32,7 +33,8 @@
 #define cudaGraphicsResourceGetMappedPointer hipGraphicsResourceGetMappedPointer
 #define cudaGraphicsResource hipGraphicsResource 
 #define cudaGraphicsGLRegisterBuffer hipGraphicsGLRegisterBuffer
-#define cudaGraphicsRegisterFlagsWriteDiscard hipGraphicsRegisterFlagsWriteDiscard
+#define cudaGraphicsMapResources hipGraphicsMapResources
+#define cudaGraphicsMapFlagsWriteDiscard hipGraphicsRegisterFlagsWriteDiscard
 
 #define cudaGLGetDevices hipGLGetDevices
 #define cudaGLDeviceListAll hipGLDeviceListAll
