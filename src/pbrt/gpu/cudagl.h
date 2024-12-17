@@ -383,8 +383,8 @@ CUDAOutputBuffer<PIXEL_FORMAT>::CUDAOutputBuffer(int32_t width, int32_t height) 
     if (glDevice != current_device)
         LOG_FATAL("Multi-GPU not supported with GL interop yet");
 #endif
-    CHECK(cudaGraphicsGLRegisterBuffer(&m_cuda_gfx_resource, m_pbo,
-                                       cudaGraphicsMapFlagsWriteDiscard) == cudaSuccess);
+    CUDA_CHECK(cudaGraphicsGLRegisterBuffer(&m_cuda_gfx_resource, m_pbo,
+                                            cudaGraphicsMapFlagsWriteDiscard));
 
     CUDA_CHECK(cudaEventCreate(&readbackFinishedEvent));
     CUDA_CHECK(cudaMallocHost(&m_host_pixels, m_width * m_height * sizeof(PIXEL_FORMAT)));
