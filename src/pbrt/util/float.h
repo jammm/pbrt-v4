@@ -203,24 +203,24 @@ inline constexpr Float gamma(int n) {
 }
 
 inline PBRT_CPU_GPU Float AddRoundUp(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__HIPCC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dadd_rn(a, b);
+    return __dadd_rd(a, b);
 #else
-    return __fadd_rn(a, b);
+    return __fadd_rd(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatUp(a + b);
 #endif
 }
 inline PBRT_CPU_GPU Float AddRoundDown(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__HIPCC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dadd_rn(a, b);
+    return __dadd_rd(a, b);
 #else
-    return __fadd_rn(a, b);
+    return __fadd_rd(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatDown(a + b);
 #endif
 }
@@ -233,97 +233,97 @@ inline PBRT_CPU_GPU Float SubRoundDown(Float a, Float b) {
 }
 
 inline PBRT_CPU_GPU Float MulRoundUp(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__HIPCC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dmul_rn(a, b);
+    return __dmul_rd(a, b);
 #else
-    return __fmul_rn(a, b);
+    return __fmul_rd(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatUp(a * b);
 #endif
 }
 
 inline PBRT_CPU_GPU Float MulRoundDown(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__HIPCC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dmul_rn(a, b);
+    return __dmul_rd(a, b);
 #else
-    return __fmul_rn(a, b);
+    return __fmul_rd(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatDown(a * b);
 #endif
 }
 
 inline PBRT_CPU_GPU Float DivRoundUp(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__HIPCC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __ddiv_rn(a, b);
+    return __ddiv_rd(a, b);
 #else
-    return __fdiv_rn(a, b);
+    return __fdiv_rd(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatUp(a / b);
 #endif
 }
 
 inline PBRT_CPU_GPU Float DivRoundDown(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__HIPCC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __ddiv_rn(a, b);
+    return __ddiv_rd(a, b);
 #else
-    return __fdiv_rn(a, b);
+    return __fdiv_rd(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatDown(a / b);
 #endif
 }
 
 inline PBRT_CPU_GPU Float SqrtRoundUp(Float a) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__HIPCC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dsqrt_rn(a);
+    return __dsqrt_rd(a);
 #else
-    return __fsqrt_rn(a);
+    return __fsqrt_rd(a);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatUp(std::sqrt(a));
 #endif
 }
 
 inline PBRT_CPU_GPU Float SqrtRoundDown(Float a) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__HIPCC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dsqrt_rn(a);
+    return __dsqrt_rd(a);
 #else
-    return __fsqrt_rn(a);
+    return __fsqrt_rd(a);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return std::max<Float>(0, NextFloatDown(std::sqrt(a)));
 #endif
 }
 
 inline PBRT_CPU_GPU Float FMARoundUp(Float a, Float b, Float c) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__HIPCC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __fma_rn(a, b, c);  // FIXME: what to do here?
+    return __fma_rd(a, b, c);  // FIXME: what to do here?
 #else
-    return __fma_rn(a, b, c);
+    return __fma_rd(a, b, c);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatUp(FMA(a, b, c));
 #endif
 }
 
 inline PBRT_CPU_GPU Float FMARoundDown(Float a, Float b, Float c) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__HIPCC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __fma_rn(a, b, c);  // FIXME: what to do here?
+    return __fma_rd(a, b, c);  // FIXME: what to do here?
 #else
-    return __fma_rn(a, b, c);
+    return __fma_rd(a, b, c);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatDown(FMA(a, b, c));
 #endif
 }
