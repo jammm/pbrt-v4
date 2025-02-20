@@ -1134,8 +1134,8 @@ PBRT_CPU_GPU inline Float FloatTexture::Evaluate(TextureEvalContext ctx) const {
     return Dispatch(eval);
 }
 
-PBRT_CPU_GPU inline SampledSpectrum SpectrumTexture::Evaluate(
-    TextureEvalContext ctx, SampledWavelengths lambda) const {
+PBRT_CPU_GPU inline SampledSpectrum SpectrumTexture::Evaluate(TextureEvalContext ctx,
+                                                 SampledWavelengths lambda) const {
     auto eval = [&](auto ptr) { return ptr->Evaluate(ctx, lambda); };
     return Dispatch(eval);
 }
