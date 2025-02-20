@@ -70,13 +70,8 @@ inline int GetBlockSize(const char *description, F kernel) {
         return iter->second;
 
     int minGridSize, blockSize;
-// this API is not reliable in HIP sometimes returning even negative values
-#ifdef __HIPCC__  
-    blockSize = 64;
-#else
     CUDA_CHECK(
         cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, kernel, 0, 0));
-#endif
     kernelBlockSizes[index] = blockSize;
     LOG_VERBOSE("[%s]: block size %d", description, blockSize);
 

@@ -100,6 +100,6 @@
 #define cudaStreamSynchronize hipStreamSynchronize
 #define cudaDeviceSynchronize hipDeviceSynchronize
 
-#define cudaOccupancyMaxPotentialBlockSize hipOccupancyMaxPotentialBlockSize
+#define cudaOccupancyMaxPotentialBlockSize hipModuleOccupancyMaxPotentialBlockSize
 
 #endif  // PBRT_UTIL_HIP_ALIASES_H
