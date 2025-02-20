@@ -9,11 +9,7 @@
 #include <pbrt/film.h>
 #include <pbrt/filters.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
-#if defined(__HIPCC__)
-#include <pbrt/gpu/hiprt/aggregate.h>
-#else
 #include <pbrt/gpu/optix/aggregate.h>
-#endif
 #include <pbrt/gpu/memory.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/lights.h>
@@ -177,8 +173,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
             dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
         CHECK(mr);
 #ifdef __HIPCC__
-        aggregate = new HiprtAggregate(scene, mr, textures, shapeIndexToAreaLights, media,
-                                       namedMaterials, materials, maxQueueSize);
+        // TODO: use HIPRT
 #else
         aggregate = new OptiXAggregate(scene, mr, textures, shapeIndexToAreaLights, media,
                                        namedMaterials, materials);
