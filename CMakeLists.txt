@@ -63,9 +63,9 @@ function (CHECK_EXT NAME DIR HASH)
   endif (GIT_FOUND)
 endfunction ()
 
-check_ext ("OpenEXR" "openexr/src" f723c3940fff287c0a26b425b90a8e764823bfd4)
+check_ext ("OpenEXR" "openexr/OpenEXR" ca757f97033ae7cfcc6130f23c0e9ee86b108b07)
 check_ext ("OpenVDB" "openvdb/nanovdb" 385516321b272c423e2a514b41bd21ce6ffdda72)
-check_ext ("Ptex" "ptex/src" 054047d02b9e06e690420b407114d2872435b953)
+check_ext ("Ptex" "ptex/src" 4cd8e9a6db2b06e478dfbbd8c26eb6df97f84483)
 check_ext ("double-conversion" "double-conversion/cmake" cc1f75a114aca8d2af69f73a5a959aecbab0e87a)
 check_ext ("filesystem" "filesystem/filesystem" c5f9de30142453eb3c6fe991e82dfc2583373116)
 check_ext ("glfw" "glfw/docs" 7b6aead9fb88b3623e3b3725ebb42670cbe4c579)
@@ -104,17 +104,6 @@ endif ()
 set (BUILD_SHARED_LIBS OFF)
 
 add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/src/ext)
-
-find_package(OpenEXR 3.1.1)
-
-if (OPENEXR_FOUND)
-  message (STATUS "Found OpenEXR version ${OPENEXR_VERSION}")
-else ()
-  message (STATUS "OpenEXR not found; building it from scratch.")
-  add_subdirectory (src/ext/openexr)
-  set_property (TARGET IlmThread Iex OpenEXR
-                PROPERTY FOLDER "ext/OpenEXR")
-endif ()
 
 ########################################
 # os/compiler-specific stuff
@@ -868,6 +857,7 @@ target_include_directories (pbrt_lib PUBLIC
   src/ext
   ${STB_INCLUDE}
   ${QOI_INCLUDE}
+  ${OPENEXR_INCLUDE}
   ${ZLIB_INCLUDE_DIRS}
   ${LIBDEFLATE_INCLUDE_DIRS}
   ${FILESYSTEM_INCLUDE}
@@ -885,7 +875,7 @@ endif ()
 
 target_compile_options (pbrt_lib PUBLIC ${PBRT_CXX_FLAGS})
 
-target_link_libraries (pbrt_lib PRIVATE OpenEXR::OpenEXR pbrt_warnings pbrt_opt $<$<BOOL:PBRT_CUDA_ENABLED>:cuda_build_configuration>)
+target_link_libraries (pbrt_lib PRIVATE pbrt_warnings pbrt_opt $<$<BOOL:PBRT_CUDA_ENABLED>:cuda_build_configuration>)
 
 add_sanitizers (pbrt_lib)
 
@@ -897,7 +887,7 @@ endif()
 set (ALL_PBRT_LIBS
   pbrt_lib
   ${CMAKE_THREAD_LIBS_INIT}
-  OpenEXR::OpenEXR
+  ${OPENEXR_LIBS}
   Ptex_static
   ${ZLIB_LIBRARIES}
   ${LIBDEFLATE_LIBRARIES}
@@ -1041,17 +1031,6 @@ set_target_properties (nanovdb2pbrt PROPERTIES OUTPUT_NAME nanovdb2pbrt)
 add_sanitizers (nanovdb2pbrt)
 
 set_property (TARGET nanovdb2pbrt PROPERTY FOLDER "cmd")
-
-# Only do this if both targets actually exist
-if (TARGET Ptex_static AND TARGET zlibstatic)
-  install(
-    TARGETS zlibstatic
-    EXPORT Ptex             # Same export set name as used by Ptex
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-  )
-endif()
 
 ######################
 # cyhair2pbrt
